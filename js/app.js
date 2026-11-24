@@ -1,6 +1,6 @@
 /* LEDGER — views, navigation and actions. */
 
-const VERSION = '1.9.3';
+const VERSION = '1.9.4';
 /* Browser engine version (the Android app's WebView updates separately from Chrome), shown under Me for support */
 const engineTag = () => { const m = navigator.userAgent.match(/Chrome\/(\d+)/); return m ? ` · ${/LedgerAndroid|; wv\)/.test(navigator.userAgent) ? 'WebView' : 'Chrome'} ${m[1]}` : ''; };
 const NAV = [
@@ -501,7 +501,9 @@ function viewMe() {
         <label class="field"><span>Water ml <em>(0 = auto)</em></span><input class="inp" type="number" inputmode="numeric" value="${S.settings.waterTarget}" data-change="setting" data-k="waterTarget"></label>
         <label class="field"><span>Sound effects</span><select data-change="setting" data-k="sound"><option value="1" ${S.settings.sound ? 'selected' : ''}>On</option><option value="0" ${S.settings.sound ? '' : 'selected'}>Off</option></select></label>
         <label class="field"><span>Volume <em id="volVal">${Math.round((S.settings.volume ?? 0.7) * 100)}%</em></span><input type="range" min="0" max="100" value="${Math.round((S.settings.volume ?? 0.7) * 100)}" data-input="volume" data-change="volumeDone" aria-label="Volume"></label>
-      </div>`)}
+        ${Native.isApp && Native.renderMode ? `<label class="field"><span>Drawing mode <em>(Android)</em></span><select data-change="rendering">${RENDER_MODES.map(([v, l]) => `<option value="${v}" ${Native.renderMode === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>` : ''}
+      </div>
+      ${Native.isApp && Native.renderMode ? '<p class="tiny muted mt-s">Seeing coloured dots or glitches while switching screens? Try another drawing mode; it applies instantly.</p>' : ''}`)}
     ${card(`${cardHead('Your data', '', 'shield')}
       <p class="small muted">Everything is stored privately on this device and works offline. Export a backup regularly, and use it to move your progress between your phone and computer.</p>
       <div class="row gap mt wrap">
@@ -957,7 +959,10 @@ function addFoodItem(f, qty) {
 }
 function rerenderAppearance() { document.querySelectorAll('#appearanceBody').forEach(b => morphHTML(b, appearanceHTML())); }
 /* ---------- Change / input handlers ---------- */
+/* How Android draws the app's WebView (native side: MainActivity.applyRendering) */
+const RENDER_MODES = [['standard', 'Standard (default)'], ['layer', 'Layered'], ['software', 'Software (slowest, safest)']];
 const CHG = {
+  rendering: el => Native.p.ledger.rendering({ mode: el.value }).then(r => { Native.renderMode = r.mode; toast(`Drawing mode: ${RENDER_MODES.find(m => m[0] === r.mode)?.[1] || r.mode}`); }).catch(() => toast('Update the Ledger app to change this')),
   setVal: el => { const s = S.active.entries[el.dataset.e].sets[el.dataset.s]; s[el.dataset.f] = Math.max(0, parseFloat(el.value) || 0); save(); },
   swapEx: el => { const old = S.active.entries[el.dataset.e], n = makeEntry(el.value, null, null, old && old.lo && getEx(el.value)?.gym ? { sets: old.sets.length, rest: old.rest } : null); S.active.entries[el.dataset.e] = n; save(); render(); },
   addEx: el => { if (!el.value) return; S.active.entries.push(makeEntry(el.value)); save(); render(); setTimeout(() => document.getElementById(`ex-${S.active.entries.length - 1}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50); },

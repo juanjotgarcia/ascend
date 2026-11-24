@@ -21,7 +21,7 @@ function nativePlugin(name) {
 
 const Native = {
   isApp: !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()),
-  p: {}, wsig: '', timer: null,
+  p: {}, wsig: '', timer: null, renderMode: null,
 
   init() {
     if (!this.isApp) return;
@@ -36,6 +36,7 @@ const Native = {
     this.p.notif.createChannel({ id: 'reminders', name: 'Reminders', description: 'Habits, workouts, water and the verse of the day', importance: 4, vibration: true, visibility: 1 }).catch(() => { });
     document.addEventListener('visibilitychange', () => this.p.ledger.visible({ on: !document.hidden }).catch(() => { }));
     this.drain();
+    this.p.ledger.rendering({}).then(r => { this.renderMode = r.mode; if (route === 'me') render(); }).catch(() => { });
     setTimeout(() => this.sync(true), 1500);
   },
 
