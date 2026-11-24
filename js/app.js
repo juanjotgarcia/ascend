@@ -1,6 +1,6 @@
 /* ZELUM — views, navigation and actions. */
 
-const VERSION = '1.13.0';
+const VERSION = '1.13.1';
 /* Browser engine version (the Android app's WebView updates separately from Chrome), shown under Me for support */
 const engineTag = () => { const m = navigator.userAgent.match(/Chrome\/(\d+)/); return m ? ` · ${/LedgerAndroid|; wv\)/.test(navigator.userAgent) ? 'WebView' : 'Chrome'} ${m[1]}` : ''; };
 const NAV = [
@@ -725,8 +725,37 @@ function tick() {
   if (rest && Date.now() >= rest.end) { rest = null; islandSig = ''; restFinished(); }
   renderIsland();
   checkReminders();
+  if (Updater.pending) Updater.tryApply();   // a waiting update goes in as soon as things are calm
   try { Native.workoutSync(); } catch (e) { console.warn(e); }
 }
+
+/* ---------- Updates ----------
+   The service worker opens Zelum from the copy on the phone (instant, offline) and downloads any new version in
+   the background. When one is ready it says so, and the app restarts into it at a calm moment: right away when
+   nothing is open, otherwise once sheets are closed and no rest timer runs, or silently when the app goes to the
+   background. Progress is saved first; an active workout survives the restart. */
+const Updater = {
+  pending: null, lastCheck: 0,
+  ready(v) { if (!v || v === VERSION) return; this.pending = v; this.tryApply(); },
+  calm() {
+    const a = document.activeElement;
+    return !document.querySelector('.sheet-wrap') && !rest && !(a && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName));
+  },
+  tryApply() { if (this.pending && !document.hidden && this.calm()) this.apply(false); },
+  apply(silent) {
+    const v = this.pending; this.pending = null;
+    try { saveNow(false); } catch (e) { }
+    if (silent) return location.reload();
+    toast(`${icon('refresh', 'xs')} Updating Zelum to v${esc(v)}…`);
+    setTimeout(() => location.reload(), 900);
+  },
+  check() {
+    if (Date.now() - this.lastCheck < 5 * 60000) return this.tryApply();
+    this.lastCheck = Date.now();
+    navigator.serviceWorker.getRegistration().then(r => { if (r) { r.update().catch(() => { }); if (r.active) r.active.postMessage({ type: 'check' }); } }).catch(() => { });
+    this.tryApply();
+  },
+};
 
 /* =====================================================================
    ACTIONS (click)
@@ -1086,9 +1115,18 @@ Music.handleRedirect().finally(() => Music.start());   // restore the signed-in 
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
   // The worker serves the app from the device cache; on a local preview that would hide fresh edits until a second reload.
   // The Google Play build has its files inside the app, so it needs no worker (and must drop the live site's old cache).
-  if (Native.store || /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) {
+  // Add ?sw to a local preview's address to test the service worker (updates, offline) there too
+  if (Native.store || (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname) && !/[?&]sw\b/.test(location.search))) {
     navigator.serviceWorker.getRegistrations().then(rs => rs.forEach(r => r.unregister())).catch(() => { });
     if (Native.store && window.caches) caches.keys().then(ks => ks.forEach(k => caches.delete(k))).catch(() => { });
   }
-  else navigator.serviceWorker.register('sw.js').catch(() => { });
+  else {
+    navigator.serviceWorker.register('sw.js').catch(() => { });
+    navigator.serviceWorker.addEventListener('message', e => { if (e.data && e.data.type === 'update-ready') Updater.ready(e.data.version); });
+    // Back in the foreground: look for a new version (and apply a waiting one while nothing is going on)
+    document.addEventListener('visibilitychange', () => {
+      if (document.hidden) { if (Updater.pending && !S.active) Updater.apply(true); return; }
+      Updater.check();
+    });
+  }
 }

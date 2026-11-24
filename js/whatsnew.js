@@ -10,7 +10,7 @@
 
 const RELEASES = [
   {
-    v: '1.13.0', date: '2026-11-24',
+    v: '1.13.1', date: '2026-11-24',
     title: 'Meet Zelum',
     intro: 'Thanks for training with us. We hope you\'re enjoying the app! This is our biggest update yet: a new name, a smoother feel and new ways to go further.',
     items: [
@@ -21,6 +21,7 @@ const RELEASES = [
       ['improved', 'Much smoother', 'Taps respond up to 5× faster, screens crossfade and a pill slides between tabs. Built for 120 Hz screens.'],
       ['improved', 'Your account, your choice', 'Delete your account and cloud backup any time from Me → Account.'],
       ['improved', 'Reminders', 'Exact reminder times are now optional (Me → Notifications → Exact times).'],
+      ['fixed', 'Updates arrive right away', 'Zelum now refreshes itself a few seconds after an update is ready, instead of waiting for a full restart.'],
       ['fixed', 'Smoother sheets', 'Pop-up sheets no longer blur the whole screen, which caused stutter on some Android phones.'],
       ['fixed', 'Music colors', 'Could fail when the app went to the background while it was still starting.'],
       ['fixed', 'Badges', 'Three gym badges were listed twice.'],
@@ -73,7 +74,7 @@ function whatsNewHTML(list) {
       <h2>${esc(top.title)}</h2>
       <p class="small muted wn-intro">Hey${name}! ${esc(top.intro)}</p>
     </div>
-    ${S.founder && list.some(r => r.v === '1.13.0') ? `<div class="plan-founder mt">${icon('crown', 'sm')} <span>You were here first, so you're a <b>Founder</b>: every Pro feature is yours for life, on us.</span></div>` : ''}
+    ${S.founder && list.some(r => r.v === '1.13.1') ? `<div class="plan-founder mt">${icon('crown', 'sm')} <span>You were here first, so you're a <b>Founder</b>: every Pro feature is yours for life, on us.</span></div>` : ''}
     ${list.map(release).join('')}
     <button class="btn primary wide mt" data-act="closeSheet">Let's go</button>
     <p class="tiny muted center-t mt-s">See this again any time: Me → the version number.</p>`;
