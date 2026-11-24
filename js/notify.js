@@ -105,7 +105,9 @@ function restFinished() {
 /* ---------- Reminders ---------- */
 const NOTIF_DEFAULTS = { enabled: false, workout: { on: true, time: '17:00' }, water: { on: true, every: 2, from: '08:00', to: '20:00' }, verse: { on: true, time: '07:00' }, habits: true };
 const toMin = hm => { const [h, m] = String(hm || '0:0').split(':').map(Number); return h * 60 + (m || 0); };
-const fmtHM = hm => { const [h, m] = hm.split(':').map(Number); return new Date(2000, 0, 1, h, m).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }); };
+// toLocaleTimeString is slow (~0.2 ms a call) and the Me screen re-renders often: remember each answer.
+const fmtHMMemo = new Map();
+const fmtHM = hm => { let s = fmtHMMemo.get(hm); if (s === undefined) { const [h, m] = hm.split(':').map(Number); s = new Date(2000, 0, 1, h, m).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }); fmtHMMemo.set(hm, s); } return s; };
 function todaysReminders() { return remindersFor(today()); }
 /* Reminders for any day (future days assume nothing is done yet; the app reschedules after every change) */
 function remindersFor(k) {

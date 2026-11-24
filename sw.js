@@ -1,9 +1,9 @@
 /* Zelum service worker — caches the app shell so it works fully offline. Bump CACHE when files change
    (updates also arrive without a bump: see refreshShell). */
-const CACHE = 'ledger-v1.13.1';
+const CACHE = 'ledger-v1.14.0';
 const FILES = [
   './', './index.html', './manifest.webmanifest', './css/styles.css',
-  './js/data.js', './js/gym.js', './js/store.js', './js/engine.js', './js/coach.js', './js/ui.js', './js/sfx.js', './js/firebase-config.js', './js/cloud.js', './js/habits.js', './js/ranks.js', './js/spotify-config.js', './js/music.js', './js/notify.js', './js/native.js', './js/billing-config.js', './js/plans.js', './js/whatsnew.js', './js/figures.js', './js/gymui.js', './js/app.js', './auth.html',
+  './js/data.js', './js/gym.js', './js/store.js', './js/engine.js', './js/coach.js', './js/ui.js', './js/sfx.js', './js/firebase-config.js', './js/cloud.js', './js/habits.js', './js/ranks.js', './js/spotify-config.js', './js/music.js', './js/notify.js', './js/native.js', './js/billing-config.js', './js/plans.js', './js/whatsnew.js', './js/figures.js', './js/gymui.js', './js/motion.js', './js/app.js', './auth.html',
   './icons/icon.svg', './icons/icon-192.png', './icons/icon-512.png', './icons/icon-maskable-512.png', './icons/apple-touch-icon.png', './icons/badge-96.png',
 ];
 self.addEventListener('install', e => {

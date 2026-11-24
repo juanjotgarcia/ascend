@@ -1,6 +1,6 @@
 /* ZELUM — views, navigation and actions. */
 
-const VERSION = '1.13.1';
+const VERSION = '1.14.0';
 /* Browser engine version (the Android app's WebView updates separately from Chrome), shown under Me for support */
 const engineTag = () => { const m = navigator.userAgent.match(/Chrome\/(\d+)/); return m ? ` · ${/LedgerAndroid|; wv\)/.test(navigator.userAgent) ? 'WebView' : 'Chrome'} ${m[1]}` : ''; };
 const NAV = [
@@ -91,6 +91,7 @@ function render(scrollTop = false) {
   for (const [sel, cls] of fxQueue) document.querySelectorAll(sel).forEach(n => { n.classList.remove(cls); void n.offsetWidth; n.classList.add(cls); });
   fxQueue = [];
   countUps(scrollTop);
+  Motion.routeChanged(S.onboarded ? (route === 'path' ? 'Path to King' : (NAV.find(n => n.id === route) || {}).label || '') : '');
   tick();
 }
 let fxQueue = [];
@@ -1104,6 +1105,7 @@ setTimeout(() => {
 }, 4000);
 // Pieces that only depend on the saved state are remembered between renders (memoState in ui.js)
 Gfx.init();
+Motion.init();
 dayCompletion = memoState(dayCompletion);
 weeklyReview = memoState(weeklyReview);
 route = (location.hash || '#today').slice(1);

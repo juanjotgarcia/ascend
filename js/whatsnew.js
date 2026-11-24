@@ -10,6 +10,18 @@
 
 const RELEASES = [
   {
+    v: '1.14.0', date: '2026-11-24',
+    title: 'Fluid motion',
+    intro: 'Zelum now moves like your phone\'s own apps: soft, springy and fast.',
+    items: [
+      ['new', 'Elastic edges', 'Pull past the top or bottom of a screen and it stretches, then springs back. A fast scroll bounces softly at the end.'],
+      ['new', 'Compact title', 'When the big title scrolls away, a slim bar with the screen\'s name stays at the top.'],
+      ['new', 'Touch highlight', 'Cards light up softly under your finger.'],
+      ['improved', 'Full refresh rate', 'The Android app now asks for your screen\'s fastest refresh rate (90, 120 or 144 Hz). Install the new app version once to get it.'],
+      ['improved', 'Faster Me screen', 'Changes on the Me screen redraw faster.'],
+    ],
+  },
+  {
     v: '1.13.1', date: '2026-11-24',
     title: 'Meet Zelum',
     intro: 'Thanks for training with us. We hope you\'re enjoying the app! This is our biggest update yet: a new name, a smoother feel and new ways to go further.',

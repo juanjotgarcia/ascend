@@ -1061,3 +1061,23 @@ details.whyd ul { margin-top: 6px; padding-left: 14px; display: grid; gap: 3px; 
 .wn-ic.new { color: var(--xp); background: color-mix(in srgb, var(--xp) 14%, transparent); }
 .wn-ic.improved { color: var(--accent-hi); background: color-mix(in srgb, var(--accent) 16%, transparent); }
 .wn-ic.fixed { color: var(--success); background: color-mix(in srgb, var(--success) 14%, transparent); }
+
+/* ---------- Motion v1.14: elastic edges, collapsing title, press highlight (js/motion.js) ----------
+   All of it is transform/opacity on one element at a time. The big title fades with a scroll-driven animation,
+   which Chrome runs on the GPU in step with the scroll itself (no script per frame). */
+#topbar { position: fixed; z-index: 25; top: 0; left: 0; right: 0; height: calc(var(--safe-t) + 50px); padding: var(--safe-t) 22px 0;
+  display: flex; align-items: center; background: rgba(0, 0, 0, .9); border-bottom: 1px solid rgba(255, 255, 255, .08);
+  opacity: 0; pointer-events: none; transition: opacity .22s cubic-bezier(.2, .8, .2, 1); }
+#topbar b { font-size: 18px; font-weight: 750; letter-spacing: -.02em; opacity: 0; transform: translate3d(0, 10px, 0);
+  transition: transform .38s cubic-bezier(.16, 1, .3, 1), opacity .24s ease; }
+#topbar.on { opacity: 1; }
+#topbar.on b { opacity: 1; transform: none; }
+.onboarding #topbar { display: none; }
+@media (min-width: 1000px) { #topbar { display: none; } }
+
+@supports (animation-timeline: scroll()) {
+  #view > .page-head h1, #view > .hello { transform-origin: 0 50%; animation: titleAway linear both; animation-timeline: scroll(root); animation-range: 0px 90px; }
+  @keyframes titleAway { to { opacity: 0; transform: translate3d(0, -6px, 0) scale(.94); } }
+}
+
+.glass.pressed::before { background: rgba(255, 255, 255, .065); }
