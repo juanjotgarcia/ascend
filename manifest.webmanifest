@@ -1,0 +1,22 @@
+{
+  "name": "Ledger — Calisthenics, Habits & Faith",
+  "short_name": "Ledger",
+  "description": "Calisthenics training with progressive overload, skills, nutrition, habits and faith — leveled up like a game.",
+  "start_url": "./index.html#today",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#000000",
+  "theme_color": "#000000",
+  "categories": ["health", "fitness", "lifestyle"],
+  "icons": [
+    { "src": "icons/icon-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icons/icon-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icons/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" },
+    { "src": "icons/icon.svg", "sizes": "any", "type": "image/svg+xml" }
+  ],
+  "shortcuts": [
+    { "name": "Train", "url": "./index.html#train" },
+    { "name": "Fuel", "url": "./index.html#fuel" }
+  ]
+}

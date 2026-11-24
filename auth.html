@@ -1,0 +1,78 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Ledger · Sign in</title>
+  <meta name="theme-color" content="#000000">
+  <meta name="robots" content="noindex">
+  <link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+  <style>
+    :root { color-scheme: dark; }
+    html, body { margin: 0; min-height: 100%; background: radial-gradient(120% 60% at 30% -10%, #2a1f8f 0%, #000 60%) fixed, #000; color: #f5f5f7;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "Segoe UI", system-ui, sans-serif; }
+    main { min-height: 100vh; display: grid; place-items: center; padding: 24px; box-sizing: border-box; }
+    .card { width: 100%; max-width: 380px; text-align: center; padding: 30px 24px; border-radius: 30px;
+      background: linear-gradient(180deg, rgba(255,255,255,.09), rgba(255,255,255,.02)), rgba(16,16,20,.7); border: 1px solid rgba(255,255,255,.12);
+      box-shadow: inset 0 1px 0 rgba(255,255,255,.15), 0 30px 60px -30px #000; backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px); }
+    svg.logo { width: 76px; height: 76px; border-radius: 20px; box-shadow: 0 0 0 1px rgba(255,255,255,.15); }
+    h1 { font-size: 24px; margin: 16px 0 6px; letter-spacing: -.02em; }
+    p { color: rgba(235,235,245,.62); font-size: 14.5px; line-height: 1.45; margin: 0; }
+    .btn { display: flex; align-items: center; justify-content: center; gap: 10px; width: 100%; min-height: 50px; margin-top: 22px; border-radius: 999px; border: 0;
+      font: 600 16px inherit; font-family: inherit; cursor: pointer; text-decoration: none; }
+    .google { background: #fff; color: #1f1f1f; }
+    .back { background: linear-gradient(135deg, #0a84ff, #5e5ce6); color: #fff; }
+    .err { color: #ff6961; margin-top: 14px; font-size: 13px; }
+    [hidden] { display: none !important; }
+  </style>
+</head>
+<body>
+<main>
+  <div class="card">
+    <svg class="logo" viewBox="0 0 512 512" aria-hidden="true"><rect width="512" height="512" rx="115" fill="#000"/><g fill="#fff"><rect x="204" y="80" width="44" height="352"/><rect x="134" y="150" width="184" height="44"/><rect x="204" y="388" width="174" height="44"/></g></svg>
+    <h1 id="title">Sign in to Ledger</h1>
+    <p id="sub">Back up your progress and sync it between your phone and computer.</p>
+    <button class="btn google" id="go">
+      <svg viewBox="0 0 48 48" width="20" height="20" aria-hidden="true"><path fill="#EA4335" d="M24 9.5c3.5 0 6.6 1.2 9.1 3.6l6.8-6.8C35.8 2.4 30.3 0 24 0 14.6 0 6.6 5.4 2.6 13.3l7.9 6.2C12.4 13.6 17.7 9.5 24 9.5z"/><path fill="#4285F4" d="M46.1 24.5c0-1.6-.1-3.1-.4-4.5H24v9h12.4c-.5 2.9-2.2 5.3-4.6 6.9l7.4 5.7c4.3-4 6.9-9.9 6.9-17.1z"/><path fill="#FBBC05" d="M10.5 28.5c-.5-1.4-.8-2.9-.8-4.5s.3-3.1.8-4.5l-7.9-6.2C.9 16.6 0 20.2 0 24s.9 7.4 2.6 10.7l7.9-6.2z"/><path fill="#34A853" d="M24 48c6.5 0 11.9-2.1 15.9-5.8l-7.4-5.7c-2.1 1.4-4.8 2.2-8.5 2.2-6.3 0-11.6-4.1-13.5-9.7l-7.9 6.2C6.6 42.6 14.6 48 24 48z"/></svg>
+      Continue with Google
+    </button>
+    <a class="btn back" id="back" hidden>Return to Ledger</a>
+    <p class="err" id="err" hidden></p>
+  </div>
+</main>
+<script src="js/firebase-config.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.14.1/firebase-auth-compat.js"></script>
+<script>
+  /* Used by the Ledger Android app: Google blocks sign-in inside embedded app web views,
+     so the app opens this page in a secure Chrome tab. After sign-in it hands the Google
+     tokens back to the app through a ledger:// link, and signs this browser session out. */
+  const $ = id => document.getElementById(id);
+  firebase.initializeApp(FIREBASE_CONFIG);
+  const auth = firebase.auth();
+  auth.setPersistence(firebase.auth.Auth.Persistence.NONE).catch(() => {});
+  $('go').onclick = async () => {
+    $('err').hidden = true;
+    try {
+      const provider = new firebase.auth.GoogleAuthProvider();
+      provider.setCustomParameters({ prompt: 'select_account' });
+      const result = await auth.signInWithPopup(provider);
+      // The compat SDK puts the Google tokens on result.credential (credentialFromResult is for the modular SDK)
+      const cred = result.credential || (firebase.auth.GoogleAuthProvider.credentialFromResult && firebase.auth.GoogleAuthProvider.credentialFromResult(result)) || {};
+      if (!cred.idToken && !cred.accessToken) throw new Error('Google did not return sign-in tokens — please try again');
+      const url = 'ledger://auth?' + new URLSearchParams({ id_token: cred.idToken || '', access_token: cred.accessToken || '' });
+      $('title').textContent = 'You\'re signed in';
+      $('sub').textContent = (result.user && result.user.email ? result.user.email + ' · ' : '') + 'tap below to return to the app.';
+      $('go').hidden = true;
+      $('back').href = url; $('back').hidden = false;
+      auth.signOut().catch(() => {});
+      setTimeout(() => { location.href = url; }, 300);
+    } catch (e) {
+      if (e && (e.code === 'auth/popup-closed-by-user' || e.code === 'auth/cancelled-popup-request')) return;
+      $('err').textContent = 'Sign-in failed: ' + ((e && (e.code || e.message)) || e);
+      $('err').hidden = false;
+    }
+  };
+</script>
+</body>
+</html>
