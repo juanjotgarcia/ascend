@@ -209,7 +209,7 @@ function habitRing(h, k) {
   else if (h.type === 'count') { act = 'habitInc'; glyph = done ? 'check' : 'plus'; }
   return `<button class="hring ${done ? 'full' : ''}" ${act ? `data-act="${act}"` : `data-go="${go}"`} data-id="${h.id}" aria-label="${h.type === 'count' ? `Add ${h.step || 1}` : 'Complete'}">
     <svg class="r" viewBox="0 0 46 46"><circle cx="23" cy="23" r="${r}" fill="none" stroke="rgba(255,255,255,.2)" stroke-width="2.4" ${dashed ? 'stroke-dasharray="5 4.2"' : ''}/>
-    ${pct > 0 ? `<circle cx="23" cy="23" r="${r}" fill="none" stroke="${done ? 'var(--success)' : c}" stroke-width="3.4" stroke-linecap="round" stroke-dasharray="${circ}" stroke-dashoffset="${circ * (1 - pct)}" transform="rotate(-90 23 23)" style="filter:drop-shadow(0 0 4px ${c})"/>` : ''}</svg>
+    ${pct > 0 ? `<circle cx="23" cy="23" r="${r}" fill="none" stroke="${done ? 'var(--success)' : c}" stroke-width="3.4" stroke-linecap="round" stroke-dasharray="${circ}" stroke-dashoffset="${circ * (1 - pct)}" transform="rotate(-90 23 23)"/>` : ''}</svg>
     ${icon(glyph)}</button>`;
 }
 function habitRow(h, k, i = 0) {

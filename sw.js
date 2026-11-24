@@ -1,6 +1,6 @@
 /* Ledger service worker — caches the app shell so it works fully offline. Bump CACHE when files change
    (updates also arrive without a bump: see refreshShell). */
-const CACHE = 'ledger-v1.9.1';
+const CACHE = 'ledger-v1.9.2';
 const FILES = [
   './', './index.html', './manifest.webmanifest', './css/styles.css',
   './js/data.js', './js/gym.js', './js/store.js', './js/engine.js', './js/coach.js', './js/ui.js', './js/sfx.js', './js/firebase-config.js', './js/cloud.js', './js/habits.js', './js/ranks.js', './js/spotify-config.js', './js/music.js', './js/notify.js', './js/native.js', './js/figures.js', './js/gymui.js', './js/app.js', './auth.html',

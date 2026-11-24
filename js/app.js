@@ -1,6 +1,6 @@
 /* LEDGER — views, navigation and actions. */
 
-const VERSION = '1.9.1';
+const VERSION = '1.9.2';
 const NAV = [
   { id: 'today', label: 'Today', icon: 'home' },
   { id: 'train', label: 'Train', icon: 'train' },

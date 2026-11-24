@@ -116,8 +116,10 @@ function ring({ pct = 0, size = 64, sw = 7, color = 'var(--blue)', inner = '', g
   return `<div class="ring" style="width:${size}px;height:${size}px">
     <svg viewBox="0 0 ${size} ${size}" width="${size}" height="${size}">
       <circle cx="${size / 2}" cy="${size / 2}" r="${r}" stroke="rgba(255,255,255,.09)" stroke-width="${sw}" fill="none"/>
+      ${glow && p > 0 ? `<circle class="ring-fg ring-halo" cx="${size / 2}" cy="${size / 2}" r="${r}" stroke="${color}" stroke-width="${sw + 5}" fill="none" stroke-linecap="round"
+        stroke-dasharray="${c}" stroke-dashoffset="${c * (1 - p)}" transform="rotate(-90 ${size / 2} ${size / 2})" style="--c0:${c}"/>` : ''}
       <circle class="ring-fg" cx="${size / 2}" cy="${size / 2}" r="${r}" stroke="${color}" stroke-width="${sw}" fill="none" stroke-linecap="round"
-        stroke-dasharray="${c}" stroke-dashoffset="${c * (1 - p)}" transform="rotate(-90 ${size / 2} ${size / 2})" style="--c0:${c};${glow ? `filter:drop-shadow(0 0 6px ${color})` : ''}"/>
+        stroke-dasharray="${c}" stroke-dashoffset="${c * (1 - p)}" transform="rotate(-90 ${size / 2} ${size / 2})" style="--c0:${c}"/>
     </svg><div class="ring-in">${inner}</div></div>`;
 }
 const bar = (pct, color = 'var(--blue)', cls = '') => `<div class="bar ${cls}"><i style="width:${(clamp(pct) * 100).toFixed(1)}%;background:${color}"></i></div>`;

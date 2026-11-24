@@ -86,7 +86,7 @@ function shieldSVG(tier, size = 64, locked = false) {
   }
   if (t.emblem) {
     const s = 0.15, tx = 60 - 256 * s, ty = 68 - 256 * s, fill = t.emblem === 'white' ? '#ffffff' : f(t.emblem);
-    g += `<g transform="translate(${tx} ${ty}) scale(${s})" ${t.emblem === 'white' ? 'style="filter:drop-shadow(0 0 30px #fff)"' : ''}>`
+    g += `<g transform="translate(${tx} ${ty}) scale(${s})">`
       + `<g fill="#000" opacity=".28" transform="translate(14 18)"><rect x="204" y="80" width="44" height="352"/><rect x="134" y="150" width="184" height="44"/><rect x="204" y="388" width="174" height="44"/></g>`
       + `<g fill="${fill}"><rect x="204" y="80" width="44" height="352"/><rect x="134" y="150" width="184" height="44"/><rect x="204" y="388" width="174" height="44"/></g></g>`;
   }
