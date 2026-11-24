@@ -44,7 +44,7 @@ function deloadBanner() {
   return card(`<div class="row center gap"><span class="m-ic">${icon('moon')}</span><div class="grow"><b>Deload week</b><p class="tiny muted">Until ${fmtDate(S.deload.until)} · targets ~10% lighter, one set fewer.</p></div><button class="btn ghost sm" data-act="coachEndDeload">End</button></div>`, 'span2 deload-card');
 }
 /* This week, Monday → Sunday: done sessions, planned sessions (next routines in order), rest days */
-function weekStrip() {
+function trainWeekStrip() {
   const wk = weekKey(), t = today(), gym = gymMode();
   let queue = [];
   if (gym) { const days = planRoutines(), nx = nextRoutine(); if (nx) { const i = days.indexOf(nx); queue = [...days.slice(i), ...days.slice(0, i)]; } }
@@ -98,7 +98,7 @@ function gymWorkoutsTab() {
   return `<div class="grid mt">
     ${deloadBanner()}
     ${top ? card(`<div class="row center gap"><span class="m-ic ${top.kind}">${icon(top.icon)}</span><div class="grow"><p class="tiny muted">Coach Caleb</p><b class="small">${esc(top.title)}</b></div><button class="btn ghost sm" data-act="trainTab" data-v="coach">Why ${icon('right', 'xs')}</button></div>`, 'span2 coach-peek') : ''}
-    ${weekStrip()}
+    ${trainWeekStrip()}
     ${planCard()}
     ${routinesCard()}
     ${weeklyCoachCard()}

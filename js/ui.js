@@ -267,6 +267,8 @@ function countUps(fromZero) {
   });
 }
 
+/* Remove every particle and floating +XP still in flight (called on tab switch, so none outlive their screen) */
+function clearFx() { document.querySelectorAll('.spark, .xp-float').forEach(n => n.remove()); }
 function burst(x = innerWidth / 2, y = innerHeight / 2, n = 28) {
   if (matchMedia('(prefers-reduced-motion: reduce)').matches) return;
   const colors = ['--xp', '--accent', '--streak', '--faith', '--success'].map(cssVar).concat('#fff');
@@ -275,6 +277,7 @@ function burst(x = innerWidth / 2, y = innerHeight / 2, n = 28) {
     p.className = 'spark';
     const a = (Math.PI * 2 * i) / n + Math.random() * 0.4, d = 80 + Math.random() * 140;
     p.style.cssText = `left:${x}px;top:${y}px;background:${colors[i % colors.length]};--dx:${Math.cos(a) * d}px;--dy:${Math.sin(a) * d}px`;
+    p.addEventListener('animationend', () => p.remove(), { once: true });
     document.body.appendChild(p);
     setTimeout(() => p.remove(), 1000);
   }

@@ -1,6 +1,6 @@
 /* LEDGER — views, navigation and actions. */
 
-const VERSION = '1.9.0';
+const VERSION = '1.9.1';
 const NAV = [
   { id: 'today', label: 'Today', icon: 'home' },
   { id: 'train', label: 'Train', icon: 'train' },
@@ -48,7 +48,7 @@ function go(r) {
   if (r === 'skills') { trainTab = 'skills'; r = 'train'; }
   if (!NAV.find(n => n.id === r) && r !== 'path') r = 'today';
   if (r === 'habits' && route !== 'habits') habitDay = today();
-  route = r;
+  route = r; clearFx();
   if (location.hash !== '#' + r) history.replaceState(null, '', '#' + r);
   render(true);
   document.querySelector('.nav-btn.on')?.classList.add('just');
@@ -257,7 +257,7 @@ function calWorkoutsTab() {
         <button class="tpl glass-btn ${id === rec ? 'rec' : ''}" data-act="start" data-tpl="${id}">
           <span class="tpl-ic">${icon(T.icon)}</span><b>${esc(T.name)}</b><span class="tiny muted">${id === rec ? 'Recommended' : esc(T.desc)}</span></button>`).join('')}
       </div>`, 'span2')}
-    ${weekStrip()}
+    ${trainWeekStrip()}
     ${weeklyCoachCard()}
     ${card(`${cardHead('Progressions', '<span class="tiny muted">Overload engine</span>', 'mountain')}
       <p class="tiny muted">Hit the top of the rep range on every set → add weight or level up. Tap a figure for form tips, ‹ › to adjust.</p>
