@@ -7,6 +7,7 @@
    Tokens and API keys stay on this device. */
 
 const SPOTIFY_SCOPES = 'user-read-currently-playing user-read-playback-state';
+const SPOTIFY_BLOCKED = 'Spotify refused this account. The Ledger owner must add its email in the Spotify Developer Dashboard → Ledger → User Management, then disconnect and connect Spotify here again.';
 const LASTFM_BLANK = '2a96cbd8b46e442fc41c2b86b821562f';   // Last.fm's placeholder star image
 
 const Music = {
@@ -15,6 +16,7 @@ const Music = {
   status: 'off',      // off | idle | playing | error | setup
   error: '',
   timer: null, misses: 0, lastId: '',
+  blocked: false, blockedTold: false,   // Spotify refused this account (not on the developer app's user list)
 
   cfg() { return S.settings.music; },
   on() { return !!(this.cfg() && this.cfg().enabled); },
@@ -30,7 +32,7 @@ const Music = {
     if (!this.on() || !this.ready()) { this.setStatus(this.on() ? 'setup' : 'off'); this.clear(); return; }
     const loop = async () => {
       if (!document.hidden) await this.poll();
-      this.timer = setTimeout(loop, this.track && this.track.playing ? 3000 : 8000);
+      this.timer = setTimeout(loop, this.blocked ? 60000 : this.track && this.track.playing ? 3000 : 8000);
     };
     loop();
   },
@@ -38,6 +40,7 @@ const Music = {
   async poll() {
     try {
       const t = this.cfg().source === 'spotify' ? await this.spotifyNow() : await this.lastfmNow();
+      if (this.blocked) { this.blocked = false; renderNowPlaying(); }
       if (t && t.playing) {
         this.misses = 0;
         const changed = t.id !== this.lastId;
@@ -48,7 +51,12 @@ const Music = {
         this.track = null; this.lastId = ''; this.setStatus('idle'); this.clear(); renderNowPlaying();
       }
     } catch (e) {
-      console.warn('Music:', e); this.error = e.message || String(e); this.setStatus('error');
+      console.warn('Music:', e); this.error = e.message || String(e);
+      if (e.blocked) {
+        const first = !this.blocked; this.blocked = true; this.track = null; this.clear(); renderNowPlaying();
+        if (first && !this.blockedTold) { this.blockedTold = true; toast(`${icon('play', 'xs')} Spotify hasn't let this account into Ledger yet — see Me → Appearance`); }
+      }
+      this.setStatus('error');
     }
   },
   async recolor(t) {
@@ -130,7 +138,10 @@ const Music = {
     let r = await fetch('https://api.spotify.com/v1/me/player/currently-playing?additional_types=track,episode', { headers: { Authorization: `Bearer ${await this.spotifyToken()}` } });
     if (r.status === 204) return null;
     if (r.status === 401) { const t = this.sp(); if (t) { t.exp = 0; this.setSp(t); } return null; }
-    if (r.status === 403) throw new Error('Spotify refused access (the app owner needs Premium, and your account must be on the app\'s user list)');
+    if (r.status === 403) {
+      // Development-mode Spotify apps only serve accounts the owner added under User Management (up to 5)
+      const e = new Error(SPOTIFY_BLOCKED); e.blocked = true; throw e;
+    }
     if (!r.ok) throw new Error(`Spotify HTTP ${r.status}`);
     const j = await r.json(), it = j.item; if (!it) return null;
     const imgs = (it.album || it.show || {}).images || [];
@@ -191,6 +202,8 @@ async function paletteFrom(url) {
 /* ---------- Now Playing bar (Today) ---------- */
 function nowPlayingHTML() {
   const t = Music.track;
+  if (Music.on() && Music.blocked) return `<button class="nowplaying glass np-blocked" data-go="me">
+    <span class="np-art">${icon('play')}</span><span class="grow np-text"><b>Spotify hasn't let this account in yet</b><span>Ledger only follows what plays in Spotify · tap for the fix</span></span></button>`;
   if (!Music.on() || !t) return '';
   return `<a class="nowplaying glass" href="${esc(t.url || '#')}" target="_blank" rel="noopener">
     ${t.art ? `<img src="${esc(t.art)}" alt="" crossorigin="anonymous">` : `<span class="np-art">${icon('star')}</span>`}
@@ -216,7 +229,7 @@ function musicSettingsHTML() {
     ${c.enabled ? `
     <div class="seg mt">${[['lastfm', 'Last.fm · free'], ['spotify', 'Spotify · Premium']].map(([v, l]) => `<button class="${c.source === v ? 'on' : ''}" data-act="musicSource" data-v="${v}">${l}</button>`).join('')}</div>
     ${c.source === 'spotify' ? (SPOTIFY_CLIENT_ID
-      ? `<p class="tiny muted mt-s">Spotify only allows this when the app owner has Premium.</p>${sp ? `<button class="btn ghost wide mt-s" data-act="spotifyOff">Disconnect Spotify</button>` : `<button class="btn spotify wide mt-s" data-act="spotifyOn">${icon('play', 'sm')} Connect Spotify</button>`}`
+      ? `<p class="tiny muted mt-s">Ledger doesn't play music: it follows what's playing in the Spotify app. Spotify only allows accounts the Ledger owner has added (Spotify Developer Dashboard → User Management, up to 5 people), and the owner needs Premium.</p>${sp ? `<button class="btn ghost wide mt-s" data-act="spotifyOff">Disconnect Spotify</button>` : `<button class="btn spotify wide mt-s" data-act="spotifyOn">${icon('play', 'sm')} Connect Spotify</button>`}`
       : `<p class="tiny muted mt-s">Spotify needs a one-time developer setup (and Premium). Ask Claude to finish it, or use Last.fm for free.</p>`)
       : `<p class="tiny muted mt-s">Connect Spotify to Last.fm once (last.fm → Settings → Applications → Spotify). On Android, a free scrobbler app adds YouTube Music, Apple Music and others.</p>
       <div class="form-grid mt-s">

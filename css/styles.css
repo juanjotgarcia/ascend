@@ -970,3 +970,4 @@ details.whyd ul { margin-top: 6px; padding-left: 14px; display: grid; gap: 3px; 
 /* Glows without filters (blur filters drew coloured pixel garbage on some Android GPUs) */
 .ph-shield, .lu-shield, .rank-node.cur .rn-shield { background: radial-gradient(closest-side, color-mix(in srgb, var(--xp) 24%, transparent), transparent); }
 .ring-halo { opacity: .22; }
+.np-blocked { width: 100%; text-align: left; color: inherit; }

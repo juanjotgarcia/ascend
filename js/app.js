@@ -1,6 +1,6 @@
 /* LEDGER — views, navigation and actions. */
 
-const VERSION = '1.9.4';
+const VERSION = '1.9.5';
 /* Browser engine version (the Android app's WebView updates separately from Chrome), shown under Me for support */
 const engineTag = () => { const m = navigator.userAgent.match(/Chrome\/(\d+)/); return m ? ` · ${/LedgerAndroid|; wv\)/.test(navigator.userAgent) ? 'WebView' : 'Chrome'} ${m[1]}` : ''; };
 const NAV = [
