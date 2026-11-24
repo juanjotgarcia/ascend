@@ -1,6 +1,8 @@
 /* LEDGER — views, navigation and actions. */
 
-const VERSION = '1.9.2';
+const VERSION = '1.9.3';
+/* Browser engine version (the Android app's WebView updates separately from Chrome), shown under Me for support */
+const engineTag = () => { const m = navigator.userAgent.match(/Chrome\/(\d+)/); return m ? ` · ${/LedgerAndroid|; wv\)/.test(navigator.userAgent) ? 'WebView' : 'Chrome'} ${m[1]}` : ''; };
 const NAV = [
   { id: 'today', label: 'Today', icon: 'home' },
   { id: 'train', label: 'Train', icon: 'train' },
@@ -508,7 +510,7 @@ function viewMe() {
         ${installEvt ? `<button class="btn primary" data-act="install">${icon('download', 'sm')} Install app</button>` : ''}
         <button class="btn ghost danger-text" data-act="resetAll">${icon('trash', 'sm')} Reset</button>
       </div>
-      <p class="tiny muted mt">iPhone: open in Safari → Share → <b>Add to Home Screen</b>. Android/PC: browser menu → <b>Install app</b>. · v${VERSION}</p>`)}
+      <p class="tiny muted mt">iPhone: open in Safari → Share → <b>Add to Home Screen</b>. Android/PC: browser menu → <b>Install app</b>. · v${VERSION}${engineTag()}</p>`)}
   </div>`;
 }
 
