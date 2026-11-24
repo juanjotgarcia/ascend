@@ -3,7 +3,8 @@
    • Buttons on that notification (+15s, Skip, Set done) are queued natively and applied here.
    • Reminders are scheduled as exact Android notifications for the next 3 days.
    • Home-screen widgets get fresh data after every change.
-   • Google sign-in and Spotify open in a secure Chrome tab and come back via ledger:// links. */
+   • Google sign-in and Spotify open in a secure Chrome tab and come back via ledger:// links.
+   • Music colors from any player: LedgerPlugin.nowPlaying reads Android's media sessions (see music.js). */
 
 /* Talk to a native plugin through Android's built-in bridge (no Capacitor JS library needed).
    Every method returns a Promise; addListener(event, callback) subscribes to plugin events. */
@@ -32,6 +33,7 @@ const Native = {
     this.p.app.getLaunchUrl().then(r => { if (r && r.url) this.onUrl(r.url); }).catch(() => { });
     this.p.app.addListener('resume', () => { this.drain(); this.sync(true); });
     this.p.ledger.addListener('workoutAction', () => this.drain());
+    this.p.ledger.addListener('nowPlayingChanged', () => Music.phoneEvent());   // a music app started, stopped or skipped
     this.p.notif.addListener('localNotificationActionPerformed', e => { const to = e && e.notification && e.notification.extra && e.notification.extra.to; if (to) go(to); });
     this.p.notif.createChannel({ id: 'reminders', name: 'Reminders', description: 'Habits, workouts, water and the verse of the day', importance: 4, vibration: true, visibility: 1 }).catch(() => { });
     document.addEventListener('visibilitychange', () => this.p.ledger.visible({ on: !document.hidden }).catch(() => { }));

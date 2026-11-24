@@ -48,7 +48,7 @@ function defaultState() {
     deload: null,          // { start, until } — a lighter recovery week
     settings: { glassMl: 250, restSec: 90, sound: true, waterTarget: 0, kcalTarget: 0, proteinTarget: 0,
       theme: { preset: 'midnight', colors: {}, glow: 0.55, blur: 26 },
-      music: { enabled: false, source: 'lastfm', lfUser: '', lfKey: '' },
+      music: { enabled: false, source: 'phone', lfUser: '', lfKey: '' },   // 'phone' = any player (Android app); the web uses Last.fm
       notif: { enabled: false, workout: { on: true, time: '17:00' }, water: { on: true, every: 2, from: '08:00', to: '20:00' }, verse: { on: true, time: '07:00' }, habits: true } },
   };
 }

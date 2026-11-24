@@ -1,7 +1,11 @@
 /* LEDGER — music-reactive colors.
    Reads what you're listening to and recolors the app from the album cover.
-   Two sources:
-     • Spotify (direct):   OAuth with PKCE, no server. Spotify requires the developer-app owner to have Premium.
+   Three sources:
+     • This phone (Android app only, default): reads the music controls of ANY player (Spotify, YouTube Music,
+                           Apple Music, Deezer…) through Android's media sessions. Needs Notification access once.
+                           No account and no user limit, so it scales to a public release.
+     • Spotify (direct):   OAuth with PKCE, no server. Spotify requires the developer-app owner to have Premium,
+                           and Development mode serves at most 5 allowlisted accounts.
      • Last.fm (free):     your public "now playing" via a free API key. Spotify (free or Premium) can
                            send plays to Last.fm, and on Android any music app can via a scrobbler app.
    Tokens and API keys stay on this device. */
@@ -9,46 +13,62 @@
 const SPOTIFY_SCOPES = 'user-read-currently-playing user-read-playback-state';
 const SPOTIFY_BLOCKED = 'Spotify refused this account. The Ledger owner must add its email in the Spotify Developer Dashboard → Ledger → User Management, then disconnect and connect Spotify here again.';
 const LASTFM_BLANK = '2a96cbd8b46e442fc41c2b86b821562f';   // Last.fm's placeholder star image
+const APK_URL = 'https://github.com/juanjotgarcia/ascend/releases/latest/download/ledger.apk';
+const PLAYER_NAMES = {   // used when Android doesn't tell Ledger the player's name
+  'com.spotify.music': 'Spotify', 'com.google.android.apps.youtube.music': 'YouTube Music', 'com.google.android.youtube': 'YouTube',
+  'com.apple.android.music': 'Apple Music', 'deezer.android.app': 'Deezer', 'com.amazon.mp3': 'Amazon Music',
+  'com.soundcloud.android': 'SoundCloud', 'com.aspiro.tidal': 'TIDAL', 'com.pandora.android': 'Pandora',
+};
 
 const Music = {
-  track: null,        // { id, title, artist, album, art, artSmall, url, playing }
+  track: null,        // { id, title, artist, album, art, artSmall, url, app, playing }
   overlay: null,      // theme colors taken from the current album
   status: 'off',      // off | idle | playing | error | setup
   error: '',
-  timer: null, misses: 0, lastId: '',
+  timer: null, misses: 0, lastId: '', lastArt: '',
   blocked: false, blockedTold: false,   // Spotify refused this account (not on the developer app's user list)
+  phone: { supported: null, access: false, art: {} },   // supported: null = not checked yet, false = web or an older APK
 
   cfg() { return S.settings.music; },
+  /* The source actually used: "This phone" only exists in the Android app, so the web falls back to Last.fm */
+  src() { const s = this.cfg().source; return s === 'phone' && !Native.isApp ? 'lastfm' : s; },
   on() { return !!(this.cfg() && this.cfg().enabled); },
   ready() {
-    const c = this.cfg();
-    if (c.source === 'spotify') return !!(SPOTIFY_CLIENT_ID && this.sp());
+    const c = this.cfg(), s = this.src();
+    if (s === 'phone') return !!(this.phone.supported && this.phone.access);
+    if (s === 'spotify') return !!(SPOTIFY_CLIENT_ID && this.sp());
     return !!(c.lfUser && c.lfKey);
   },
 
   /* ---------- Polling loop ---------- */
   start() {
     this.stop();
-    if (!this.on() || !this.ready()) { this.setStatus(this.on() ? 'setup' : 'off'); this.clear(); return; }
+    if (this.on() && this.src() === 'phone' && this.phone.supported === null) { this.checkPhone().then(() => this.start()); return; }
+    if (!this.on() || !this.ready()) { this.track = null; this.lastId = ''; this.setStatus(this.on() ? 'setup' : 'off'); this.clear(); renderNowPlaying(); return; }
+    const phone = this.src() === 'phone';   // local and cheap: check often so colors follow skips quickly
+    const gen = this.gen;
     const loop = async () => {
       if (!document.hidden) await this.poll();
-      this.timer = setTimeout(loop, this.blocked ? 60000 : this.track && this.track.playing ? 3000 : 8000);
+      if (gen !== this.gen) return;         // stopped or restarted while checking
+      this.timer = setTimeout(loop, this.blocked ? 60000 : this.track && this.track.playing ? (phone ? 2500 : 3000) : (phone ? 5000 : 8000));
     };
     loop();
   },
-  stop() { clearTimeout(this.timer); this.timer = null; },
+  gen: 0,
+  stop() { clearTimeout(this.timer); this.timer = null; this.gen++; },
   async poll() {
     try {
-      const t = this.cfg().source === 'spotify' ? await this.spotifyNow() : await this.lastfmNow();
+      const s = this.src();
+      const t = s === 'phone' ? await this.phoneNow() : s === 'spotify' ? await this.spotifyNow() : await this.lastfmNow();
       if (this.blocked) { this.blocked = false; renderNowPlaying(); }
       if (t && t.playing) {
         this.misses = 0;
-        const changed = t.id !== this.lastId;
-        this.track = t; this.lastId = t.id; this.setStatus('playing');
+        const changed = t.id !== this.lastId || (t.artSmall || '') !== this.lastArt;   // a cover can arrive after its title
+        this.track = t; this.lastId = t.id; this.lastArt = t.artSmall || ''; this.setStatus('playing');
         if (changed) await this.recolor(t);
         renderNowPlaying();
       } else if (++this.misses >= 2) {           // nothing playing for a little while: fade back
-        this.track = null; this.lastId = ''; this.setStatus('idle'); this.clear(); renderNowPlaying();
+        this.track = null; this.lastId = ''; this.lastArt = ''; this.setStatus('idle'); this.clear(); renderNowPlaying();
       }
     } catch (e) {
       console.warn('Music:', e); this.error = e.message || String(e);
@@ -66,6 +86,38 @@ const Music = {
   },
   clear() { if (this.overlay) { this.overlay = null; applyTheme({ fade: true }); } },
   setStatus(s) { this.status = s; document.querySelectorAll('[data-music-status]').forEach(el => el.textContent = musicStatusText()); },
+
+  /* ---------- This phone (Android media sessions, via LedgerPlugin.nowPlaying) ---------- */
+  async checkPhone() {
+    const was = { ...this.phone };
+    if (!Native.isApp) this.phone.supported = false;
+    else {
+      try { const r = await Native.p.ledger.nowPlaying({ have: '' }); this.phone.supported = true; this.phone.access = !!r.access; }
+      catch (e) { this.phone.supported = false; this.phone.access = false; }   // APK from before v1.10: no nowPlaying method
+    }
+    return was.supported !== this.phone.supported || was.access !== this.phone.access;
+  },
+  async phoneNow() {
+    const have = Object.keys(this.phone.art)[0] || '';       // the cover Ledger already has isn't sent again
+    const r = await Native.p.ledger.nowPlaying({ have });
+    if (!r.access) { this.phone.access = false; setTimeout(() => { this.start(); rerenderAppearance(); }, 0); return null; }
+    if (!r.playing) return null;
+    if (r.art) this.phone.art = { [r.id]: r.art };          // keep only the current cover
+    const art = this.phone.art[r.id] || '';
+    return { id: r.id, title: r.title, artist: r.artist || '', album: r.album || '', art, artSmall: art, url: '',
+      app: r.app || PLAYER_NAMES[r.pkg] || '', playing: true };
+  },
+  /* Android says a player changed: check now instead of waiting for the next tick */
+  phoneEvent() {
+    if (!this.on() || this.src() !== 'phone') return;
+    clearTimeout(this.pingTimer);
+    this.pingTimer = setTimeout(() => { if (this.ready()) this.poll(); else this.recheck(); }, 350);
+  },
+  /* Back from Android settings: notification access may have changed */
+  async recheck() {
+    if (!this.on() || this.src() !== 'phone') return;
+    if (await this.checkPhone()) { this.start(); rerenderAppearance(); }
+  },
 
   /* ---------- Last.fm ---------- */
   async lastfmNow() {
@@ -203,33 +255,52 @@ async function paletteFrom(url) {
 function nowPlayingHTML() {
   const t = Music.track;
   if (Music.on() && Music.blocked) return `<button class="nowplaying glass np-blocked" data-go="me">
-    <span class="np-art">${icon('play')}</span><span class="grow np-text"><b>Spotify hasn't let this account in yet</b><span>Ledger only follows what plays in Spotify · tap for the fix</span></span></button>`;
+    <span class="np-art">${icon('play')}</span><span class="grow np-text"><b>Spotify hasn't let this account in yet</b><span>${Native.isApp ? 'Tip: choose “Any app” to skip Spotify’s limit · tap' : 'Ledger only follows what plays in Spotify · tap for the fix'}</span></span></button>`;
   if (!Music.on() || !t) return '';
-  return `<a class="nowplaying glass" href="${esc(t.url || '#')}" target="_blank" rel="noopener">
-    ${t.art ? `<img src="${esc(t.art)}" alt="" crossorigin="anonymous">` : `<span class="np-art">${icon('star')}</span>`}
-    <span class="grow np-text"><b>${esc(t.title)}</b><span>${esc(t.artist)}${t.album ? ' · ' + esc(t.album) : ''}</span></span>
-    <span class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i></span></a>`;
+  const sub = esc(t.artist) + (t.app ? ' · ' + esc(t.app) : t.album ? ' · ' + esc(t.album) : '');
+  const inner = `${t.art ? `<img src="${esc(t.art)}" alt="">` : `<span class="np-art">${icon('star')}</span>`}
+    <span class="grow np-text"><b>${esc(t.title)}</b><span>${sub}</span></span>
+    <span class="eq" aria-hidden="true"><i></i><i></i><i></i><i></i></span>`;
+  // A phone player opens in its own app; Spotify and Last.fm tracks open their web page
+  return t.url ? `<a class="nowplaying glass" href="${esc(t.url)}" target="_blank" rel="noopener">${inner}</a>`
+    : `<button class="nowplaying glass np-btn" data-act="openPlayer" aria-label="Open ${esc(t.app || 'the music app')}">${inner}</button>`;
 }
 function renderNowPlaying() { document.querySelectorAll('[data-nowplaying]').forEach(el => el.innerHTML = nowPlayingHTML()); }
 function musicStatusText() {
-  const c = S.settings.music, s = Music.status;
+  const c = S.settings.music, s = Music.status, src = Music.src();
   if (!c.enabled) return 'Off';
-  if (s === 'setup') return c.source === 'spotify' ? 'Connect Spotify to start' : 'Add your Last.fm username and API key';
+  if (s === 'setup') {
+    if (src === 'phone') return Music.phone.supported === false ? 'This Ledger app is too old for this. Install the newest one (link above).'
+      : Music.phone.supported === null ? 'Checking…' : 'Turn on notification access to start';
+    return src === 'spotify' ? 'Connect Spotify to start' : 'Add your Last.fm username and API key';
+  }
   if (s === 'error') return `Problem: ${Music.error}`;
-  if (s === 'playing' && Music.track) return `Now playing: ${Music.track.title} — ${Music.track.artist}`;
-  return 'Listening… play a song and the colors will follow';
+  if (s === 'playing' && Music.track) return `Now playing: ${Music.track.title} — ${Music.track.artist}${Music.track.app ? ' (' + Music.track.app + ')' : ''}`;
+  return src === 'phone' ? 'Listening… play a song in any music app and the colors will follow'
+    : 'Listening… play a song and the colors will follow';
 }
 
 /* Settings block (inside Appearance) */
 function musicSettingsHTML() {
-  const c = S.settings.music, sp = Music.sp();
+  const c = S.settings.music, sp = Music.sp(), src = Music.src(), ph = Music.phone;
+  const sources = [...(Native.isApp ? [['phone', 'Any app']] : []), ['lastfm', 'Last.fm'], ['spotify', 'Spotify']];
+  const phoneHTML = () => {
+    if (ph.supported === false) return `<p class="tiny muted mt-s">This works in the newest Ledger app. Install it over this one; your progress stays.</p>
+      <a class="btn soft wide mt-s" href="${APK_URL}" target="_blank" rel="noopener">${icon('download', 'sm')} Get the newest Ledger app</a>`;
+    return `<p class="tiny muted mt-s">Works with Spotify, YouTube Music, Apple Music, Deezer and any app that shows music controls. No account needed.</p>
+      ${ph.access ? `<p class="tiny mt-s np-ok">${icon('check', 'xs')} Notification access is on</p>`
+        : `<button class="btn primary wide mt-s" data-act="musicAccess">${icon('bell', 'sm')} Allow notification access</button>
+      <p class="tiny muted mt-s">Android asks for “notification access” because that is where music controls live. Ledger only reads the song, artist and cover. It never reads your messages, and nothing leaves your phone.</p>
+      <p class="tiny muted mt-s">Switch greyed out? Android blocks it for apps installed outside the Play Store: open App info → ⋮ (top right) → <b>Allow restricted settings</b>, then come back and tap Allow again.</p>
+      <button class="btn ghost wide mt-s" data-act="musicAppInfo">Open App info</button>`}`;
+  };
   return `<h4 class="mt">${icon('sun', 'sm')} Colors from my music</h4>
     <div class="row between center mt-s"><span class="small">Recolor Ledger with the album I'm playing</span>
       <button class="switch ${c.enabled ? 'on' : ''}" data-act="musicToggle" role="switch" aria-checked="${c.enabled}" aria-label="Recolor with my music"><i></i></button></div>
     ${c.enabled ? `
-    <div class="seg mt">${[['lastfm', 'Last.fm · free'], ['spotify', 'Spotify · Premium']].map(([v, l]) => `<button class="${c.source === v ? 'on' : ''}" data-act="musicSource" data-v="${v}">${l}</button>`).join('')}</div>
-    ${c.source === 'spotify' ? (SPOTIFY_CLIENT_ID
-      ? `<p class="tiny muted mt-s">Ledger doesn't play music: it follows what's playing in the Spotify app. Spotify only allows accounts the Ledger owner has added (Spotify Developer Dashboard → User Management, up to 5 people), and the owner needs Premium.</p>${sp ? `<button class="btn ghost wide mt-s" data-act="spotifyOff">Disconnect Spotify</button>` : `<button class="btn spotify wide mt-s" data-act="spotifyOn">${icon('play', 'sm')} Connect Spotify</button>`}`
+    <div class="seg mt">${sources.map(([v, l]) => `<button class="${src === v ? 'on' : ''}" data-act="musicSource" data-v="${v}">${l}</button>`).join('')}</div>
+    ${src === 'phone' ? phoneHTML() : src === 'spotify' ? (SPOTIFY_CLIENT_ID
+      ? `<p class="tiny muted mt-s">Ledger doesn't play music: it follows what's playing in the Spotify app. Spotify only allows accounts the Ledger owner has added (Spotify Developer Dashboard → User Management, up to 5 people), and the owner needs Premium.${Native.isApp ? ' “Any app” has no such limit.' : ''}</p>${sp ? `<button class="btn ghost wide mt-s" data-act="spotifyOff">Disconnect Spotify</button>` : `<button class="btn spotify wide mt-s" data-act="spotifyOn">${icon('play', 'sm')} Connect Spotify</button>`}`
       : `<p class="tiny muted mt-s">Spotify needs a one-time developer setup (and Premium). Ask Claude to finish it, or use Last.fm for free.</p>`)
       : `<p class="tiny muted mt-s">Connect Spotify to Last.fm once (last.fm → Settings → Applications → Spotify). On Android, a free scrobbler app adds YouTube Music, Apple Music and others.</p>
       <div class="form-grid mt-s">
@@ -241,7 +312,12 @@ function musicSettingsHTML() {
 
 const MUSIC_ACT = {
   musicToggle: () => { S.settings.music.enabled = !S.settings.music.enabled; save(); Music.start(); rerenderAppearance(); render(); },
-  musicSource: d => { S.settings.music.source = d.v; save(); Music.track = null; Music.clear(); Music.start(); rerenderAppearance(); },
+  musicSource: d => { S.settings.music.source = d.v; save(); Music.track = null; Music.lastId = ''; Music.clear(); Music.start(); rerenderAppearance(); },
+  musicAccess: async () => {
+    try { await Native.p.ledger.musicSettings({ open: 'access' }); } catch (e) { toast('Open Settings → Notifications → Notification access → Ledger'); }
+  },
+  musicAppInfo: () => Native.p.ledger.musicSettings({ open: 'appinfo' }).catch(() => { }),
+  openPlayer: () => Native.p.ledger.openPlayer().catch(() => { }),
   spotifyOn: () => Music.connectSpotify(),
   spotifyOff: () => { Music.disconnectSpotify(); rerenderAppearance(); },
   lastfmSave: async () => {
@@ -252,7 +328,11 @@ const MUSIC_ACT = {
     catch (e) { toast(`Last.fm: ${esc(e.message)}`); Music.error = e.message; Music.setStatus('error'); }
   },
 };
-document.addEventListener('visibilitychange', () => { if (!document.hidden && Music.on() && Music.ready()) Music.poll(); });
+document.addEventListener('visibilitychange', () => {
+  if (document.hidden || !Music.on()) return;
+  if (Music.src() === 'phone') Music.recheck().then(() => { if (Music.ready()) Music.poll(); });   // back from Android settings?
+  else if (Music.ready()) Music.poll();
+});
 
 /* Full-screen "Return to Ledger" step used when a sign-in started in the Android app finishes in Chrome */
 function handBack(url, what) {
