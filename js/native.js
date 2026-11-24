@@ -1,4 +1,4 @@
-/* LEDGER — Android app bridge (Capacitor). Everything here is a no-op on the web.
+/* ZELUM — Android app bridge (Capacitor). Everything here is a no-op on the web.
    • Live workout notification (native foreground service) mirrors the in-app island.
    • Buttons on that notification (+15s, Skip, Set done) are queued natively and applied here.
    • Reminders are scheduled as exact Android notifications for the next 3 days.
@@ -22,7 +22,13 @@ function nativePlugin(name) {
 
 const Native = {
   isApp: !!(window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()),
+  /* The Google Play build carries the web files inside the app (tools/android-build-web.js --store adds this tag);
+     the sideloaded APK loads the live site instead. Both run at the same address, so saved data is shared. */
+  store: !!document.querySelector('meta[name="ledger-build"][content="store"]'),
   p: {}, wsig: '', timer: null, renderMode: null,
+  /* Exact reminder times (Android 12+ "Alarms & reminders"): 'granted' | 'denied' | 'na' (older app without the check).
+     Opt-in: without it reminders still arrive, Android may just hold them a few minutes to save battery. */
+  exact: null,
 
   init() {
     if (!this.isApp) return;
@@ -31,13 +37,14 @@ const Native = {
     document.documentElement.classList.add('native');
     this.p.app.addListener('appUrlOpen', e => this.onUrl(e.url));
     this.p.app.getLaunchUrl().then(r => { if (r && r.url) this.onUrl(r.url); }).catch(() => { });
-    this.p.app.addListener('resume', () => { this.drain(); this.sync(true); });
+    this.p.app.addListener('resume', () => { this.drain(); this.checkExact().then(() => this.sync(true)); });
     this.p.ledger.addListener('workoutAction', () => this.drain());
     this.p.ledger.addListener('nowPlayingChanged', () => Music.phoneEvent());   // a music app started, stopped or skipped
     this.p.notif.addListener('localNotificationActionPerformed', e => { const to = e && e.notification && e.notification.extra && e.notification.extra.to; if (to) go(to); });
-    this.p.notif.createChannel({ id: 'reminders', name: 'Reminders', description: 'Habits, workouts, water and the verse of the day', importance: 4, vibration: true, visibility: 1 }).catch(() => { });
+    this.p.notif.createChannel({ id: 'reminders', name: 'Reminders', description: 'Habits, workouts and water', importance: 4, vibration: true, visibility: 1 }).catch(() => { });
     document.addEventListener('visibilitychange', () => this.p.ledger.visible({ on: !document.hidden }).catch(() => { }));
     this.drain();
+    this.checkExact();
     this.p.ledger.rendering({}).then(r => { this.renderMode = r.mode; if (route === 'me') render(); }).catch(() => { });
     setTimeout(() => this.sync(true), 1500);
   },
@@ -61,6 +68,22 @@ const Native = {
       const q = await this.p.notif.requestPermissions();
       return q.display === 'granted';
     } catch (e) { return false; }
+  },
+  async checkExact() {
+    if (!this.isApp) return;
+    const was = this.exact;
+    try { const r = await this.p.notif.checkExactNotificationSetting(); this.exact = r && r.exact_alarm === 'granted' ? 'granted' : 'denied'; }
+    catch (e) { this.exact = 'na'; }
+    if (was !== null && was !== this.exact && route === 'me') render();
+  },
+  exactOn() { return this.exact === 'granted' || this.exact === 'na'; },
+  /* Opens Android's "Alarms & reminders" switch for Zelum, then reschedules with whatever the user chose */
+  async allowExact() {
+    try { await this.p.notif.changeExactNotificationSetting(); } catch (e) { }
+    await this.checkExact();
+    this.sync(true);
+    if (route === 'me') render();
+    toast(this.exactOn() ? 'Reminders will arrive at the exact minute' : 'Exact times are off — reminders may arrive a few minutes late');
   },
 
   /* ---------- Live workout notification ---------- */
@@ -117,6 +140,10 @@ const Native = {
       if (ours.length) await P.cancel({ notifications: ours });
     } catch (e) { }
     if (!S.onboarded || !n || !n.enabled) return;
+    if (this.exact === null) await this.checkExact();
+    // Ask for exact alarms only when the user allowed them: otherwise the plugin would open the
+    // "Alarms & reminders" settings screen on every reschedule.
+    const exact = this.exactOn();
     const list = [], ids = new Set();
     for (let d = 0; d < 3; d++) {
       const k = addDays(today(), d), [y, m, dd] = k.split('-').map(Number);
@@ -126,7 +153,7 @@ const Native = {
         let id = 100000 + (hashStr(k + r.key) % 99990);
         while (ids.has(id)) id++;
         ids.add(id);
-        list.push({ id, title: r.title, body: r.body, schedule: { at, allowWhileIdle: true }, channelId: 'reminders', smallIcon: 'ic_stat_ledger', iconColor: '#FFFFFF', extra: { to: r.to } });
+        list.push({ id, title: r.title, body: r.body, schedule: { at, allowWhileIdle: true }, isExactNotification: exact, channelId: 'reminders', smallIcon: 'ic_stat_ledger', iconColor: '#FFFFFF', extra: { to: r.to } });
       }
     }
     list.sort((a, b) => a.schedule.at - b.schedule.at);
@@ -134,17 +161,19 @@ const Native = {
   },
   updateWidgets() {
     if (!S.onboarded) return;
-    const k = today(), due = buildDue(k), open = due.filter(h => !habitDone(h, k)), li = levelInfo(), v = verseOfDay(), c = themeColors();
+    const k = today(), due = buildDue(k), open = due.filter(h => !habitDone(h, k)), li = levelInfo(), c = themeColors();
+    const v = faithOn() ? verseOfDay() : { text: quoteOfDay(), ref: '' };   // the daily-line widget: verse only in Faith mode
     const next = S.active ? `In progress: ${S.active.name}` : workoutsOn(k).length ? 'Trained today ✓' : isTrainingDay(k) ? `Next: ${tplInfo(nextTemplate()).name}` : 'Rest day — recover well';
     this.p.ledger.widgets({
       done: due.length - open.length, due: due.length, streak: streak(), rank: `${li.title} · Lv ${li.lvl}`,
-      accent: c.accent, faith: c.faith, next, verse: v.text, ref: v.ref, quote: quoteOfDay(),
+      accent: c.accent, faith: c.faith, next, verse: v.text, ref: v.ref, quote: faithOn() ? quoteOfDay() : '',
       habits: [...open, ...due.filter(h => habitDone(h, k))].slice(0, 3).map(h => ({ name: h.name, done: habitDone(h, k) })),
     }).catch(e => console.warn('widgets', e));
   },
   async testNotification() {
-    if (!(await this.ensurePermission())) return toast('Allow notifications for Ledger in Android settings');
-    await this.p.notif.schedule({ notifications: [{ id: 199999, title: 'Ledger notifications are on', body: 'Reminders arrive on time, even when Ledger is closed.', schedule: { at: new Date(Date.now() + 2500), allowWhileIdle: true }, channelId: 'reminders', smallIcon: 'ic_stat_ledger', iconColor: '#FFFFFF' }] });
+    if (!(await this.ensurePermission())) return toast('Allow notifications for Zelum in Android settings');
+    if (this.exact === null) await this.checkExact();
+    await this.p.notif.schedule({ notifications: [{ id: 199999, title: 'Zelum notifications are on', body: 'Reminders arrive even when Zelum is closed.', schedule: { at: new Date(Date.now() + 2500), allowWhileIdle: true }, isExactNotification: this.exactOn(), channelId: 'reminders', smallIcon: 'ic_stat_ledger', iconColor: '#FFFFFF' }] });
     toast('Test notification in 2 seconds');
   },
 };

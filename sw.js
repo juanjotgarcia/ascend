@@ -1,9 +1,9 @@
-/* Ledger service worker — caches the app shell so it works fully offline. Bump CACHE when files change
+/* Zelum service worker — caches the app shell so it works fully offline. Bump CACHE when files change
    (updates also arrive without a bump: see refreshShell). */
-const CACHE = 'ledger-v1.10.0';
+const CACHE = 'ledger-v1.13.0';
 const FILES = [
   './', './index.html', './manifest.webmanifest', './css/styles.css',
-  './js/data.js', './js/gym.js', './js/store.js', './js/engine.js', './js/coach.js', './js/ui.js', './js/sfx.js', './js/firebase-config.js', './js/cloud.js', './js/habits.js', './js/ranks.js', './js/spotify-config.js', './js/music.js', './js/notify.js', './js/native.js', './js/figures.js', './js/gymui.js', './js/app.js', './auth.html',
+  './js/data.js', './js/gym.js', './js/store.js', './js/engine.js', './js/coach.js', './js/ui.js', './js/sfx.js', './js/firebase-config.js', './js/cloud.js', './js/habits.js', './js/ranks.js', './js/spotify-config.js', './js/music.js', './js/notify.js', './js/native.js', './js/billing-config.js', './js/plans.js', './js/whatsnew.js', './js/figures.js', './js/gymui.js', './js/app.js', './auth.html',
   './icons/icon.svg', './icons/icon-192.png', './icons/icon-512.png', './icons/icon-maskable-512.png', './icons/apple-touch-icon.png', './icons/badge-96.png',
 ];
 self.addEventListener('install', e => {
@@ -12,10 +12,10 @@ self.addEventListener('install', e => {
 self.addEventListener('activate', e => {
   e.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim()));
 });
-/* Cache first: Ledger opens instantly from the device, never waiting on a slow or patchy connection
+/* Cache first: Zelum opens instantly from the device, never waiting on a slow or patchy connection
    (the old network-first strategy made every launch wait for ~20 round trips before the first frame).
    A few seconds after each launch the whole shell is re-downloaded in the background and swapped in
-   as one consistent set, so a new version is used the next time Ledger opens. */
+   as one consistent set, so a new version is used the next time Zelum opens. */
 let refreshing = null, lastRefresh = 0;
 function refreshShell() {
   if (refreshing || Date.now() - lastRefresh < 60000) return refreshing || Promise.resolve();
@@ -44,7 +44,7 @@ self.addEventListener('fetch', e => {
   );
 });
 
-/* Tapping a notification opens (or focuses) Ledger on the right screen */
+/* Tapping a notification opens (or focuses) Zelum on the right screen */
 self.addEventListener('notificationclick', e => {
   e.notification.close();
   const url = new URL((e.notification.data && e.notification.data.url) || './index.html#today', self.registration.scope).href;
@@ -55,6 +55,6 @@ self.addEventListener('notificationclick', e => {
 });
 /* Ready for server-sent reminders (Web Push) */
 self.addEventListener('push', e => {
-  let d = {}; try { d = e.data ? e.data.json() : {}; } catch (x) { d = { title: 'Ledger', body: e.data && e.data.text() }; }
-  e.waitUntil(self.registration.showNotification(d.title || 'Ledger', { body: d.body || '', icon: 'icons/icon-192.png', badge: 'icons/badge-96.png', tag: d.tag || 'ledger', data: { url: d.url || './index.html#today' } }));
+  let d = {}; try { d = e.data ? e.data.json() : {}; } catch (x) { d = { title: 'Zelum', body: e.data && e.data.text() }; }
+  e.waitUntil(self.registration.showNotification(d.title || 'Zelum', { body: d.body || '', icon: 'icons/icon-192.png', badge: 'icons/badge-96.png', tag: d.tag || 'ledger', data: { url: d.url || './index.html#today' } }));
 });

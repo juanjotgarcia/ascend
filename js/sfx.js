@@ -1,4 +1,4 @@
-/* LEDGER — premium sound effects, synthesized live with the Web Audio API.
+/* ZELUM — premium sound effects, synthesized live with the Web Audio API.
    No audio files: everything is generated on the device, so it works offline and costs nothing.
    Soft bells, glassy ticks and a touch of reverb, in the spirit of iOS system sounds. */
 const SFX = (() => {

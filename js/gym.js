@@ -1,4 +1,4 @@
-/* LEDGER — gym training: muscles, equipment, the exercise library, training splits, the plan builder
+/* ZELUM — gym training: muscles, equipment, the exercise library, training splits, the plan builder
    and the double-progression engine. Calisthenics moves from data.js join the library as bodyweight
    exercises, so one history, one coach and one set of records cover both disciplines. */
 
@@ -419,7 +419,7 @@ function recommendGym(key, opt = {}) {
   if (!last) {
     const g = startGuess(ex), t = Math.max(rg.lo, Math.min(rg.hi, rg.hi - 2));
     return { status: 'new', targets: Array(n).fill(t), kg: g, why,
-      text: `First time: ${n} × ${t}${u}. ${g ? `Cautious starting guess ≈ ${g} kg — do a lighter warm-up set first and adjust.` : 'Pick a weight you could lift about 2–3 more times than the target.'} Rate how many reps you had left; Ledger takes it from there.` };
+      text: `First time: ${n} × ${t}${u}. ${g ? `Cautious starting guess ≈ ${g} kg — do a lighter warm-up set first and adjust.` : 'Pick a weight you could lift about 2–3 more times than the target.'} Rate how many reps you had left; Zelum takes it from there.` };
   }
   const W = last.kg, ws = last.sets.filter(s => (s.kg || 0) === W), reps = ws.map(s => s.v), eff = last.effort || 0;
   const lastTxt = `Last: ${W ? `${W} kg × ` : ''}${last.sets.map(s => s.v).join(' · ')}${u}${eff ? ` (${RIR[eff].toLowerCase()})` : ''}`;

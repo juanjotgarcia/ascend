@@ -1,4 +1,4 @@
-/* LEDGER — Train screen pieces shared by both disciplines: discipline switch, gym plan & weekly
+/* ZELUM — Train screen pieces shared by both disciplines: discipline switch, gym plan & weekly
    schedule, routine editor, exercise library & detail, personal records, the coach tab and the
    training setup sheet. Views return HTML strings; actions live in TRAIN_ACT / TRAIN_CHG / TRAIN_INP. */
 
@@ -35,7 +35,7 @@ function trainHero() {
 function trainTabs() {
   const gym = gymMode(), tabs = [['workouts', 'train', 'Workouts'], ...(gym ? [] : [['skills', 'star', 'Skills']]), ['coach', 'chat', 'Coach'], ['library', 'book', 'Library'], ['records', 'trophy', 'Records']];
   if (!tabs.some(t => t[0] === trainTab)) trainTab = 'workouts';
-  return `<div class="seg tabs scroll mt">${tabs.map(([id, ic, l]) => `<button class="${trainTab === id ? 'on' : ''}" data-act="trainTab" data-v="${id}">${icon(ic, 'sm')} ${l}</button>`).join('')}</div>`;
+  return `<div class="seg tabs scroll mt">${tabs.map(([id, ic, l]) => `<button class="${trainTab === id ? 'on' : ''}" data-act="trainTab" data-v="${id}">${icon(ic, 'sm')} ${l}${(id === 'coach' || id === 'records') && !can(id) ? ` ${icon('lock', 'xs')}` : ''}</button>`).join('')}</div>`;
 }
 
 /* ---------- Gym workouts tab ---------- */
@@ -280,7 +280,7 @@ function setupHTML() {
   const seg = (k, opts) => `<div class="seg">${opts.map(([v, l]) => `<button class="${String(d[k]) === String(v) ? 'on' : ''}" data-act="setupSet" data-k="${k}" data-v="${v}">${l}</button>`).join('')}</div>`;
   const auto = autoSplit(d.schedule.length);
   return `<div class="row between center"><h3 class="sheet-title">Training setup</h3><button class="round-btn glass" data-act="closeSheet" aria-label="Close">${icon('x')}</button></div>
-    <p class="small muted">Ledger shapes your plan, rep ranges, rest times and coaching around these answers. Change them any time.</p>
+    <p class="small muted">Zelum shapes your plan, rep ranges, rest times and coaching around these answers. Change them any time.</p>
     <div class="setup">
       <label class="field"><span>Discipline</span>${seg('discipline', [['cal', 'Calisthenics'], ['gym', 'Gym / weights']])}</label>
       <div class="field"><span>Goal</span><div class="choice-list sm">${Object.entries(FOCUS).map(([v, F]) => `<button class="choice glass-btn ${d.focus === v ? 'on' : ''}" data-act="setupSet" data-k="focus" data-v="${v}"><b>${F.name}</b><span class="tiny muted">${F.blurb}</span></button>`).join('')}</div></div>
@@ -346,11 +346,11 @@ const TRAIN_ACT = {
     if (d.discipline === 'gym' && gymChanged && S.plan && planRoutines().some(r => r.edited)) askConfirm('Rebuild your plan?', 'You edited some plan days. Rebuilding with the new settings replaces them (your own routines stay).', 'Rebuild', apply, false);
     else apply();
   },
-  rebuildPlan: () => askConfirm('Rebuild your plan?', 'Ledger picks fresh exercises for every plan day from your settings, equipment and favorites. Your own routines and history stay.', 'Rebuild', () => { rebuildPlan(); refresh(); toast(`${icon('refresh', 'xs')} Plan rebuilt`); }, false),
+  rebuildPlan: () => requirePlan('plan') && askConfirm('Rebuild your plan?', 'Zelum picks fresh exercises for every plan day from your settings, equipment and favorites. Your own routines and history stay.', 'Rebuild', () => { rebuildPlan(); refresh(); toast(`${icon('refresh', 'xs')} Plan rebuilt`); }, false),
 
   /* Routines */
-  newRoutine: () => openRoutine(null),
-  editRoutine: d => openRoutine(routineById(d.id)),
+  newRoutine: () => requirePlan('routines') && openRoutine(null),
+  editRoutine: d => requirePlan('routines') && openRoutine(routineById(d.id)),
   rtSets: d => { const it = rtDraft.items[d.i]; it.sets = clamp(it.sets + +d.d, 1, 10); rerenderRt(); },
   rtMove: d => { const i = +d.i, j = i + +d.d, a = rtDraft.items; if (j < 0 || j >= a.length) return; [a[i], a[j]] = [a[j], a[i]]; rerenderRt(); },
   rtDel: d => { rtDraft.items.splice(+d.i, 1); rerenderRt(); },

@@ -1,4 +1,4 @@
-/* LEDGER — Google sign-in, cloud backup and phone ↔ computer sync (Firebase).
+/* ZELUM — Google sign-in, cloud backup and phone ↔ computer sync (Firebase).
    Offline-first: the app always works from local data; when signed in, every change is
    pushed a few seconds later, and changes from your other device arrive live.
    Data lives at users/{uid} (meta) + users/{uid}/parts/p0..pN (the saved state, in chunks). */
@@ -54,6 +54,12 @@ const Cloud = {
     if (!idToken && !accessToken) throw new Error('No sign-in token received');
     if (!(await this.load())) throw new Error('Can\'t reach Google right now');
     const cred = firebase.auth.GoogleAuthProvider.credential(idToken || null, accessToken || null);
+    // Coming back from the "confirm it's you" step of Delete account
+    if (this.pendingDelete && this.user && Date.now() - this.pendingDelete < 10 * 60000) {
+      try { await this.user.reauthenticateWithCredential(cred); }
+      catch (e) { this.pendingDelete = 0; throw new Error(e.code === 'auth/user-mismatch' ? 'that was a different Google account' : (e.code || e.message)); }
+      return this.wipe();
+    }
     await this.auth.signInWithCredential(cred);
     toast(`${icon('check', 'xs')} Signed in with Google`);
   },
@@ -65,11 +71,54 @@ const Cloud = {
     toast('Signed out — your progress stays on this device');
   },
 
+  /* Delete account (Google Play requires it in-app): removes users/{uid} and every part, then the sign-in itself.
+     Firebase only deletes an account signed in during the last few minutes, so older sessions confirm with Google first
+     (a popup on the web; on Android the Chrome tab comes back to signInWithTokens, which finishes the job). */
+  async deleteAccount() {
+    if (!this.user) return;
+    const fresh = Date.now() - new Date(this.user.metadata.lastSignInTime || 0).getTime() < 4 * 60000;
+    if (!fresh) {
+      this.pendingDelete = Date.now();
+      if (Native.isApp) { toast('Confirm it\'s you with Google to finish deleting'); Native.openBrowser(location.origin + location.pathname.replace(/index\.html$/, '') + 'auth.html'); return; }
+      const p = new firebase.auth.GoogleAuthProvider();
+      p.setCustomParameters({ login_hint: this.user.email || '' });
+      try { await this.user.reauthenticateWithPopup(p); }
+      catch (e) {
+        this.pendingDelete = 0;
+        if (!['auth/popup-closed-by-user', 'auth/cancelled-popup-request'].includes(e.code)) toast(`Couldn't confirm: ${esc(e.code === 'auth/user-mismatch' ? 'that was a different Google account' : (e.code || e.message))}`);
+        return;
+      }
+    }
+    return this.wipe();
+  },
+  async wipe() {
+    this.pendingDelete = 0;
+    const u = this.user;
+    if (!u) return;
+    clearTimeout(this.pushTimer);
+    if (this.unsub) { this.unsub(); this.unsub = null; }
+    this.setStatus('syncing');
+    try {
+      const parts = await this.ref().collection('parts').get();
+      const b = this.db.batch();
+      parts.forEach(d => b.delete(d.ref));
+      b.delete(this.ref());
+      await b.commit();
+      await u.delete();
+      this.user = null;
+      this.setMeta({ uid: null, syncedAt: 0 });
+      this.setStatus('off');
+      render();
+      toast(`${icon('check', 'xs')} Account and cloud backup deleted. Your progress stays on this device.`);
+    } catch (e) { this.fail(e, true); }
+  },
+
   async onUser(u) {
     this.user = u;
     if (this.unsub) { this.unsub(); this.unsub = null; }
     if (!u) { this.setStatus('off'); render(); return; }
     if (!S.profile.name && u.displayName) S.profile.name = u.displayName.split(' ')[0];
+    Billing.identify(u.uid);
     await this.reconcile(await this.ref().get().catch(e => { this.fail(e); return null; }), true);
     this.unsub = this.ref().onSnapshot(d => {
       if (d.metadata.hasPendingWrites) return;
@@ -164,7 +213,7 @@ function conflictSheet(cloud, cm) {
     return `${(st.workouts || []).length} workouts · level ${levelFromXP(xp)} · ${fmtN(xp)} XP`;
   };
   const when = t => t ? new Date(t).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—';
-  return `<h3 class="sheet-title">Which progress should Ledger keep?</h3>
+  return `<h3 class="sheet-title">Which progress should Zelum keep?</h3>
     <p class="small muted">This device and your Google account both have changes. The one you don't pick is kept as a safety copy on this device.</p>
     <button class="choice glass-btn mt" data-act="cloudKeep" data-v="cloud" style="width:100%"><b>${icon('upload', 'sm')} Google account</b><span class="small muted">${sum(cloud)} · saved ${when(cm.updated)}</span></button>
     <button class="choice glass-btn mt-s" data-act="cloudKeep" data-v="local" style="width:100%"><b>${icon('user', 'sm')} This device</b><span class="small muted">${sum(S)} · saved ${when(S.updatedAt)}</span></button>`;

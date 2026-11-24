@@ -1,7 +1,7 @@
 {
-  "name": "Ledger — Calisthenics, Habits & Faith",
-  "short_name": "Ledger",
-  "description": "Calisthenics training with progressive overload, skills, nutrition, habits and faith — leveled up like a game.",
+  "name": "Zelum — Calisthenics, Gym & Habits",
+  "short_name": "Zelum",
+  "description": "Calisthenics and gym training with progressive overload, skills, nutrition and habits — leveled up like a game.",
   "start_url": "./index.html#today",
   "scope": "./",
   "display": "standalone",

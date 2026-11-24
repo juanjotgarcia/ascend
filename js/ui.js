@@ -1,6 +1,7 @@
-/* LEDGER — UI primitives: icons, formatting, rings, charts, sheets, toasts, effects. */
+/* ZELUM — UI primitives: icons, formatting, rings, charts, sheets, toasts, effects. */
 
 const ICONS = {
+  lock: '<rect x="5" y="11" width="14" height="10" rx="2.5"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/>',
   home: '<path d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6h-6v6H4a1 1 0 0 1-1-1z"/>',
   train: '<path d="M6 7v10M3 9v6M18 7v10M21 9v6M6 12h12"/>',
   dumbbell: '<rect x="2.5" y="8.5" width="3" height="7" rx="1"/><rect x="5.5" y="6.5" width="3" height="11" rx="1"/><rect x="15.5" y="6.5" width="3" height="11" rx="1"/><rect x="18.5" y="8.5" width="3" height="7" rx="1"/><path d="M8.5 12h7"/>',
@@ -86,11 +87,12 @@ function applyTheme({ fade = false } = {}) {
   const fav = document.querySelector('link[rel=icon]');
   if (fav) fav.href = 'data:image/svg+xml,' + encodeURIComponent(logoSVG({ mark: c.logo, bg: c.logoBg, size: 64, xmlns: true }));
 }
-/* The Ledger mark: a cross whose foot turns into an "L". Same geometry as icons/icon.svg */
+/* The Zelum mark: a split Z (two bars and a free-standing diagonal). Same geometry as icons/icon.svg
+   and the icon generators in tools/ (512 x 512 units). */
+const LOGO_PATH = 'M136 132H376V180H136Z M136 332H376V380H136Z M293 198H376L219 314H136Z';
 function logoSVG({ mark = 'var(--logo)', bg = 'var(--logoBg)', size = 40, cls = '', xmlns = false } = {}) {
   return `<svg ${xmlns ? 'xmlns="http://www.w3.org/2000/svg" ' : ''}class="logo ${cls}" viewBox="0 0 512 512" width="${size}" height="${size}" aria-hidden="true">`
-    + `<rect width="512" height="512" rx="115" fill="${bg}"/><g fill="${mark}">`
-    + '<rect x="204" y="80" width="44" height="352"/><rect x="134" y="150" width="184" height="44"/><rect x="204" y="388" width="174" height="44"/></g></svg>';
+    + `<rect width="512" height="512" rx="115" fill="${bg}"/><path fill="${mark}" d="${LOGO_PATH}"/></svg>`;
 }
 const cssVar = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
 
@@ -104,7 +106,27 @@ function md(s) {
     .replace(/\n/g, '<br>');
 }
 const fmtN = n => Math.round(n).toLocaleString('en-US');
-function fmtDate(k, opts = { weekday: 'short', month: 'short', day: 'numeric' }) { return parseDay(k).toLocaleDateString('en-US', opts); }
+/* toLocaleDateString is slow (it builds an Intl formatter per call) and the screens ask for the same few dates
+   over and over, so remember every answer */
+const fmtDateMemo = new Map();
+function fmtDate(k, opts = { weekday: 'short', month: 'short', day: 'numeric' }) {
+  const key = k + '|' + (opts.weekday || '') + (opts.month || '') + (opts.day || '') + (opts.year || '');
+  let s = fmtDateMemo.get(key);
+  if (s === undefined) { if (fmtDateMemo.size > 2000) fmtDateMemo.clear(); s = parseDay(k).toLocaleDateString('en-US', opts); fmtDateMemo.set(key, s); }
+  return s;
+}
+/* Wraps a function whose result only depends on the saved state (and today's date): repeated calls between two
+   saves return the remembered answer. save() stamps S.updatedAt, which starts a fresh memory. */
+function memoState(fn) {
+  let epoch = '', memo = new Map();
+  return function (...args) {
+    const e = (S && S.updatedAt) + '|' + today();
+    if (e !== epoch) { epoch = e; memo = new Map(); }
+    const key = args.join('|');
+    if (memo.has(key)) return memo.get(key);
+    const v = fn.apply(this, args); memo.set(key, v); return v;
+  };
+}
 function relDay(k) {
   const d = daysBetween(k, today());
   return d === 0 ? 'Today' : d === 1 ? 'Yesterday' : d < 7 ? parseDay(k).toLocaleDateString('en-US', { weekday: 'long' }) : fmtDate(k);
@@ -199,6 +221,51 @@ function closeSheet(instant) {
     w.classList.remove('in'); setTimeout(() => w.remove(), 320);
   });
 }
+/* ---------- Graphics: Full glass or Smooth ----------
+   Real-time blur (backdrop-filter) behind the nav bar and sticky headers is the most expensive thing the GPU does
+   while you scroll. Fast phones handle it at 120 Hz; slower GPUs drop frames. "Auto" watches the first few scrolls:
+   if more than a quarter of the frames arrive late, it switches this device to Smooth (no blur, same look otherwise).
+   The choice is per device (localStorage), never synced: a fast phone and a slow one can differ. */
+const Gfx = {
+  key: 'ledger.gfx', autoKey: 'ledger.gfxAuto',
+  pref() { try { return localStorage.getItem(this.key) || 'auto'; } catch (e) { return 'auto'; } },
+  autoLite() { try { return localStorage.getItem(this.autoKey) === 'smooth'; } catch (e) { return false; } },
+  lite() { const p = this.pref(); return p === 'smooth' || (p === 'auto' && this.autoLite()); },
+  motion() {
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return false;
+    if (typeof Native !== 'undefined' && Native.renderMode === 'software') return false;
+    return !this.lite();
+  },
+  apply() { document.documentElement.classList.toggle('gfx-lite', this.lite()); },
+  set(v) { try { localStorage.setItem(this.key, v); if (v === 'auto') localStorage.removeItem(this.autoKey); } catch (e) { } this.apply(); this.samples = 0; },
+  init() {
+    this.apply();
+    addEventListener('scroll', () => this.watch(), { passive: true });
+  },
+  /* Frame-time sampling during a scroll (auto mode only, until a verdict) */
+  samples: 0, late: 0, watching: false,
+  watch() {
+    if (this.watching || this.pref() !== 'auto' || this.autoLite() || this.samples >= 240) return;
+    this.watching = true;
+    let last = 0, n = 0;
+    const deltas = [];
+    const step = t => {
+      if (last) deltas.push(t - last);
+      last = t;
+      if (++n < 60) return requestAnimationFrame(step);
+      this.watching = false;
+      if (document.hidden || deltas.length < 30) return;
+      const sorted = [...deltas].sort((a, b) => a - b), base = sorted[Math.floor(sorted.length * 0.2)];   // the screen's own frame time
+      this.samples += deltas.length;
+      this.late += deltas.filter(d => d > base * 1.6).length;
+      if (this.samples >= 120 && this.late / this.samples > 0.25) {
+        try { localStorage.setItem(this.autoKey, 'smooth'); } catch (e) { }
+        this.apply();
+      }
+    };
+    requestAnimationFrame(step);
+  },
+};
 /* Clocks tick 4× a second: only touch the DOM when the visible text actually changes */
 function setText(el, s) { if (el && el.textContent !== s) el.textContent = s; }
 function sheetEl() { return document.querySelector('.sheet-wrap .sheet'); }
@@ -210,17 +277,25 @@ function sheetEl() { return document.querySelector('.sheet-wrap .sheet'); }
    animations don't replay, focus and inner scroll positions survive, and the CSS
    transitions on rings and bars finally get to run. */
 const nodeKey = n => n.nodeType === 1 ? (n.id || n.getAttribute('data-hid') || n.getAttribute('data-key') || '') : '';
+/* Speed (120 Hz leaves 8 ms per frame, and a budget phone is ~5× slower than a PC):
+   - the same HTML as last time is skipped outright, with no parsing and no diff;
+   - an unchanged card is recognised natively with isEqualNode and skipped whole, so a tap
+     only walks the cards that really changed. Subtrees with form fields still go through
+     morphNode, which keeps their live values in step. */
 function morphHTML(el, html) {
+  if (el.__html === html) return;
   const t = document.createElement('template');
   t.innerHTML = html;
   morphChildren(el, t.content);
+  el.__html = html;
 }
+const hasField = n => n.nodeType === 1 && (/^(INPUT|SELECT|TEXTAREA)$/.test(n.nodeName) || !!n.querySelector('input,select,textarea'));
 function morphChildren(from, to) {
   let a = from.firstChild, b = to.firstChild;
   while (b) {
     const nextB = b.nextSibling;
     if (!a) from.appendChild(b);
-    else if (a.nodeType === b.nodeType && a.nodeName === b.nodeName && nodeKey(a) === nodeKey(b)) { morphNode(a, b); a = a.nextSibling; }
+    else if (a.nodeType === b.nodeType && a.nodeName === b.nodeName && nodeKey(a) === nodeKey(b)) { if (!a.isEqualNode(b) || hasField(a)) morphNode(a, b); a = a.nextSibling; }
     else { from.replaceChild(b, a); a = b.nextSibling; }
     b = nextB;
   }
@@ -228,6 +303,7 @@ function morphChildren(from, to) {
 }
 function morphNode(a, b) {
   if (a.nodeType !== 1) { if (a.nodeValue !== b.nodeValue) a.nodeValue = b.nodeValue; return; }
+  delete a.__html;   // its contents change here, so its own skip-cache (morphHTML) no longer applies
   for (const { name, value } of b.attributes) if (a.getAttribute(name) !== value) a.setAttribute(name, value);
   for (let i = a.attributes.length - 1; i >= 0; i--) { const n = a.attributes[i].name; if (!b.hasAttribute(n)) a.removeAttribute(n); }
   morphChildren(a, b);

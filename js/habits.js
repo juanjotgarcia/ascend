@@ -1,4 +1,4 @@
-/* LEDGER — advanced habits.
+/* ZELUM — advanced habits.
    Three kinds:  check (yes/no) · count (an amount: glasses, pages, minutes…) · quit (break a bad habit).
    Schedules: every day, chosen weekdays, or N times per week. Time of day groups the list.
    Streaks respect schedules; quit habits track clean time live, with milestones, urges and slips. */
@@ -388,7 +388,7 @@ function quitSheet(h) {
     </div>
     <div class="row gap mt"><button class="btn soft grow" data-act="urge" data-id="${h.id}" data-sheet="1">${icon('shield', 'sm')} I resisted an urge</button>
       <button class="btn ghost grow danger-text" data-act="slip" data-id="${h.id}">I slipped</button></div>
-    <p class="verse-text small mt center-t">“For a just man falleth seven times, and riseth up again.”</p><p class="verse-ref center-t">Proverbs 24:16</p>
+    ${faithOn() ? '<p class="verse-text small mt center-t">“For a just man falleth seven times, and riseth up again.”</p><p class="verse-ref center-t">Proverbs 24:16</p>' : '<p class="quote small mt center-t">Fall seven times, stand up eight.</p>'}
     ${calendarHTML(h, h.id)}
     ${slips.length ? `<h4 class="mt">${icon('calendar', 'sm')} Slip history</h4><ul class="slips">${slips.map(s => `<li><span>${new Date(s.t).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</span><span class="muted">${esc([s.trigger, s.note].filter(Boolean).join(' · ') || '—')}</span></li>`).join('')}</ul>` : ''}
   </div>`;
@@ -407,7 +407,7 @@ function habitEditor() {
   const d = habitDraft, isNew = !d.id, locked = !!d.auto;
   const seg = (k, opts) => `<div class="seg">${opts.map(([v, l]) => `<button class="${String(d[k]) === String(v) ? 'on' : ''}" data-act="hdSet" data-k="${k}" data-v="${v}">${l}</button>`).join('')}</div>`;
   return `<div class="row between center"><h3 class="sheet-title">${isNew ? 'New habit' : 'Edit habit'}</h3><button class="round-btn glass" data-act="closeSheet" aria-label="Close">${icon('x')}</button></div>
-    ${isNew ? `<p class="tiny muted">Start from an idea or build your own.</p><div class="tmpl">${HABIT_TEMPLATES.map((t, i) => `<button class="chip-btn" data-act="hdTemplate" data-i="${i}">${icon(t.icon, 'xs')} ${esc(t.name)}</button>`).join('')}</div>` : ''}
+    ${isNew ? `<p class="tiny muted">Start from an idea or build your own.</p><div class="tmpl">${HABIT_TEMPLATES.map((t, i) => t.cat === 'faith' && !faithOn() ? '' : `<button class="chip-btn" data-act="hdTemplate" data-i="${i}">${icon(t.icon, 'xs')} ${esc(t.name)}</button>`).join('')}</div>` : ''}
     <label class="field mt"><span>Name</span><input class="inp" name="name" value="${esc(d.name)}" data-input="hdraft" placeholder="e.g. Read the Bible"></label>
     ${locked ? '' : `<div class="field mt"><span>Type</span><div class="kinds">${Object.entries(HABIT_KINDS).map(([v, K]) => `<button class="kind glass-btn ${d.type === v ? 'on' : ''}" data-act="hdSet" data-k="type" data-v="${v}">${icon(K.icon, 'sm')}<b>${K.name}</b><span class="tiny muted">${K.sub}</span></button>`).join('')}</div></div>`}
     ${d.type === 'count' && !locked ? `<div class="form-grid mt">
@@ -419,7 +419,7 @@ function habitEditor() {
       ${d.schedKind === 'weekly' ? `<div class="row center gap mt-s"><button class="round-btn glass" data-act="hdTimes" data-d="-1">${icon('minus', 'sm')}</button><b class="big-num">${d.times}</b><span class="muted">times per week</span><button class="round-btn glass" data-act="hdTimes" data-d="1">${icon('plus', 'sm')}</button></div>` : ''}</div>` : ''}
     ${d.type !== 'quit' ? `<div class="field mt"><span>Time of day</span>${seg('tod', Object.entries(TODS))}</div>
       <label class="field mt"><span>Reminder <em>(optional — a notification at this time if it's not done yet)</em></span><input class="inp" type="time" name="remind" value="${esc(d.remind || '')}" data-input="hdraft"></label>` : ''}
-    <div class="field mt"><span>Category</span>${seg('cat', Object.entries(HABIT_CATS).map(([v, C]) => [v, C.name]))}</div>
+    <div class="field mt"><span>Category</span>${seg('cat', Object.entries(HABIT_CATS).filter(([v]) => v !== 'faith' || faithOn() || d.cat === 'faith').map(([v, C]) => [v, C.name]))}</div>
     <div class="field mt"><span>Icon</span><div class="icons">${HABIT_ICONS.map(n => `<button class="${d.icon === n ? 'on' : ''}" data-act="hdSet" data-k="icon" data-v="${n}" aria-label="${n}">${icon(n, 'sm')}</button>`).join('')}</div></div>
     <div class="field mt"><span>Color</span><div class="swatch-row">${['', ...HABIT_SWATCHES].map(c => `<button class="${(d.color || '') === c ? 'on' : ''}" data-act="hdSet" data-k="color" data-v="${c}" style="background:${c || (HABIT_CATS[d.cat] || {}).color}" aria-label="${c ? 'Color' : 'Category color'}">${c ? '' : icon('refresh', 'xs')}</button>`).join('')}</div></div>
     <label class="field mt"><span>Why does it matter? <em>(optional)</em></span><input class="inp" name="why" value="${esc(d.why || '')}" data-input="hdraft" placeholder="${d.type === 'quit' ? 'e.g. To be free and present for my family' : 'e.g. To grow closer to God'}"></label>
@@ -445,7 +445,7 @@ let slipTrigger = '';
 const HABIT_ACT = {
   habitTod: d => { habitTod = d.v; render(); },
   habitDayPick: d => { habitDay = d.k; render(); },
-  newHabit: () => openEditor(null),
+  newHabit: () => { if (activeHabits().length >= FREE_HABITS && !requirePlan('habits')) return; openEditor(null); },
   editHabit: d => openEditor(S.habits.find(h => h.id === d.id)),
   openHabit: d => { habitMonth = today().slice(0, 7); const h = S.habits.find(x => x.id === d.id); if (h) openSheet(habitSheet(d.id), { cls: 'tall', tc: habitColor(h) }); },
   habitMonth: d => {
@@ -497,13 +497,13 @@ const HABIT_ACT = {
     h.slips.push({ t: Date.now(), trigger: slipTrigger, note });
     SFX.play('toggleOff'); haptic(30); refresh();
     openSheet(`<div class="levelup"><p class="eyebrow">New run</p><div class="lu-num" style="font-size:64px">${icon('refresh')}</div><h2>The clock starts again — and so do you.</h2>
-      <p class="verse-text">“It is of the LORD's mercies that we are not consumed, because his compassions fail not. They are new every morning.”</p><p class="muted small">Lamentations 3:22–23</p>
+      ${faithOn() ? '<p class="verse-text">“It is of the LORD\'s mercies that we are not consumed, because his compassions fail not. They are new every morning.”</p><p class="muted small">Lamentations 3:22–23</p>' : '<p class="quote">You\'re not starting over. You\'re starting stronger.</p>'}
       <button class="btn primary wide mt" data-act="openHabit" data-id="${h.id}">Keep going</button></div>`, { cls: 'center' });
   },
-  hdSet: d => { habitDraft[d.k] = d.v; if (d.k === 'type' && d.v === 'quit' && habitDraft.icon === 'check') habitDraft.icon = 'ban'; SFX.play('tap'); rerenderEditor(); },
+  hdSet: d => { if (d.k === 'type' && d.v === 'quit' && !requirePlan('quit')) return; habitDraft[d.k] = d.v; if (d.k === 'type' && d.v === 'quit' && habitDraft.icon === 'check') habitDraft.icon = 'ban'; SFX.play('tap'); rerenderEditor(); },
   hdDay: d => { const v = +d.v, a = habitDraft.days; habitDraft.days = a.includes(v) ? a.filter(x => x !== v) : [...a, v]; rerenderEditor(); },
   hdTimes: d => { habitDraft.times = clamp(habitDraft.times + +d.d, 1, 7); rerenderEditor(); },
-  hdTemplate: d => { const t = HABIT_TEMPLATES[+d.i]; habitDraft = { ...draftFrom(null), ...t, color: '' }; SFX.play('tap'); rerenderEditor(); },
+  hdTemplate: d => { const t = HABIT_TEMPLATES[+d.i]; if (t.type === 'quit' && !requirePlan('quit')) return; habitDraft = { ...draftFrom(null), ...t, color: '' }; SFX.play('tap'); rerenderEditor(); },
   hdSave: () => {
     const d = habitDraft, name = (d.name || '').trim();
     if (!name) return toast('Give your habit a name');

@@ -1,4 +1,4 @@
-/* LEDGER — music-reactive colors.
+/* ZELUM — music-reactive colors.
    Reads what you're listening to and recolors the app from the album cover.
    Three sources:
      • This phone (Android app only, default): reads the music controls of ANY player (Spotify, YouTube Music,
@@ -11,10 +11,10 @@
    Tokens and API keys stay on this device. */
 
 const SPOTIFY_SCOPES = 'user-read-currently-playing user-read-playback-state';
-const SPOTIFY_BLOCKED = 'Spotify refused this account. The Ledger owner must add its email in the Spotify Developer Dashboard → Ledger → User Management, then disconnect and connect Spotify here again.';
+const SPOTIFY_BLOCKED = 'Spotify refused this account. The Zelum owner must add its email in the Spotify Developer Dashboard → Ledger → User Management, then disconnect and connect Spotify here again.';
 const LASTFM_BLANK = '2a96cbd8b46e442fc41c2b86b821562f';   // Last.fm's placeholder star image
 const APK_URL = 'https://github.com/juanjotgarcia/ascend/releases/latest/download/ledger.apk';
-const PLAYER_NAMES = {   // used when Android doesn't tell Ledger the player's name
+const PLAYER_NAMES = {   // used when Android doesn't tell Zelum the player's name
   'com.spotify.music': 'Spotify', 'com.google.android.apps.youtube.music': 'YouTube Music', 'com.google.android.youtube': 'YouTube',
   'com.apple.android.music': 'Apple Music', 'deezer.android.app': 'Deezer', 'com.amazon.mp3': 'Amazon Music',
   'com.soundcloud.android': 'SoundCloud', 'com.aspiro.tidal': 'TIDAL', 'com.pandora.android': 'Pandora',
@@ -29,9 +29,9 @@ const Music = {
   blocked: false, blockedTold: false,   // Spotify refused this account (not on the developer app's user list)
   phone: { supported: null, access: false, art: {} },   // supported: null = not checked yet, false = web or an older APK
 
-  cfg() { return S.settings.music; },
+  cfg() { return S && S.settings ? S.settings.music : null; },   // null before the state has loaded
   /* The source actually used: "This phone" only exists in the Android app, so the web falls back to Last.fm */
-  src() { const s = this.cfg().source; return s === 'phone' && !Native.isApp ? 'lastfm' : s; },
+  src() { const s = (this.cfg() || {}).source; return s === 'phone' && !Native.isApp ? 'lastfm' : s; },
   on() { return !!(this.cfg() && this.cfg().enabled); },
   ready() {
     const c = this.cfg(), s = this.src();
@@ -74,7 +74,7 @@ const Music = {
       console.warn('Music:', e); this.error = e.message || String(e);
       if (e.blocked) {
         const first = !this.blocked; this.blocked = true; this.track = null; this.clear(); renderNowPlaying();
-        if (first && !this.blockedTold) { this.blockedTold = true; toast(`${icon('play', 'xs')} Spotify hasn't let this account into Ledger yet — see Me → Appearance`); }
+        if (first && !this.blockedTold) { this.blockedTold = true; toast(`${icon('play', 'xs')} Spotify hasn't let this account into Zelum yet — see Me → Appearance`); }
       }
       this.setStatus('error');
     }
@@ -98,7 +98,7 @@ const Music = {
     return was.supported !== this.phone.supported || was.access !== this.phone.access;
   },
   async phoneNow() {
-    const have = Object.keys(this.phone.art)[0] || '';       // the cover Ledger already has isn't sent again
+    const have = Object.keys(this.phone.art)[0] || '';       // the cover Zelum already has isn't sent again
     const r = await Native.p.ledger.nowPlaying({ have });
     if (!r.access) { this.phone.access = false; setTimeout(() => { this.start(); rerenderAppearance(); }, 0); return null; }
     if (!r.playing) return null;
@@ -255,7 +255,7 @@ async function paletteFrom(url) {
 function nowPlayingHTML() {
   const t = Music.track;
   if (Music.on() && Music.blocked) return `<button class="nowplaying glass np-blocked" data-go="me">
-    <span class="np-art">${icon('play')}</span><span class="grow np-text"><b>Spotify hasn't let this account in yet</b><span>${Native.isApp ? 'Tip: choose “Any app” to skip Spotify’s limit · tap' : 'Ledger only follows what plays in Spotify · tap for the fix'}</span></span></button>`;
+    <span class="np-art">${icon('play')}</span><span class="grow np-text"><b>Spotify hasn't let this account in yet</b><span>${Native.isApp ? 'Tip: choose “Any app” to skip Spotify’s limit · tap' : 'Zelum only follows what plays in Spotify · tap for the fix'}</span></span></button>`;
   if (!Music.on() || !t) return '';
   const sub = esc(t.artist) + (t.app ? ' · ' + esc(t.app) : t.album ? ' · ' + esc(t.album) : '');
   const inner = `${t.art ? `<img src="${esc(t.art)}" alt="">` : `<span class="np-art">${icon('star')}</span>`}
@@ -270,7 +270,7 @@ function musicStatusText() {
   const c = S.settings.music, s = Music.status, src = Music.src();
   if (!c.enabled) return 'Off';
   if (s === 'setup') {
-    if (src === 'phone') return Music.phone.supported === false ? 'This Ledger app is too old for this. Install the newest one (link above).'
+    if (src === 'phone') return Music.phone.supported === false ? 'This Zelum app is too old for this. Install the newest one (link above).'
       : Music.phone.supported === null ? 'Checking…' : 'Turn on notification access to start';
     return src === 'spotify' ? 'Connect Spotify to start' : 'Add your Last.fm username and API key';
   }
@@ -283,24 +283,25 @@ function musicStatusText() {
 /* Settings block (inside Appearance) */
 function musicSettingsHTML() {
   const c = S.settings.music, sp = Music.sp(), src = Music.src(), ph = Music.phone;
-  const sources = [...(Native.isApp ? [['phone', 'Any app']] : []), ['lastfm', 'Last.fm'], ['spotify', 'Spotify']];
+  // Spotify lets a solo developer's app serve only 5 allowlisted accounts, so it is offered only to people already using it
+  const sources = [...(Native.isApp ? [['phone', 'Any app']] : []), ['lastfm', 'Last.fm'], ...(c.source === 'spotify' || sp ? [['spotify', 'Spotify']] : [])];
   const phoneHTML = () => {
-    if (ph.supported === false) return `<p class="tiny muted mt-s">This works in the newest Ledger app. Install it over this one; your progress stays.</p>
-      <a class="btn soft wide mt-s" href="${APK_URL}" target="_blank" rel="noopener">${icon('download', 'sm')} Get the newest Ledger app</a>`;
+    if (ph.supported === false) return Native.store ? `<p class="tiny muted mt-s">Update Zelum from Google Play to use this.</p>` : `<p class="tiny muted mt-s">This works in the newest Zelum app. Install it over this one; your progress stays.</p>
+      <a class="btn soft wide mt-s" href="${APK_URL}" target="_blank" rel="noopener">${icon('download', 'sm')} Get the newest Zelum app</a>`;
     return `<p class="tiny muted mt-s">Works with Spotify, YouTube Music, Apple Music, Deezer and any app that shows music controls. No account needed.</p>
       ${ph.access ? `<p class="tiny mt-s np-ok">${icon('check', 'xs')} Notification access is on</p>`
         : `<button class="btn primary wide mt-s" data-act="musicAccess">${icon('bell', 'sm')} Allow notification access</button>
-      <p class="tiny muted mt-s">Android asks for “notification access” because that is where music controls live. Ledger only reads the song, artist and cover. It never reads your messages, and nothing leaves your phone.</p>
+      <p class="tiny muted mt-s">Android asks for “notification access” because that is where music controls live. Zelum only reads the song, artist and cover. It never reads your messages, and nothing leaves your phone.</p>
       <p class="tiny muted mt-s">Switch greyed out? Android blocks it for apps installed outside the Play Store: open App info → ⋮ (top right) → <b>Allow restricted settings</b>, then come back and tap Allow again.</p>
       <button class="btn ghost wide mt-s" data-act="musicAppInfo">Open App info</button>`}`;
   };
   return `<h4 class="mt">${icon('sun', 'sm')} Colors from my music</h4>
-    <div class="row between center mt-s"><span class="small">Recolor Ledger with the album I'm playing</span>
+    <div class="row between center mt-s"><span class="small">Recolor Zelum with the album I'm playing</span>
       <button class="switch ${c.enabled ? 'on' : ''}" data-act="musicToggle" role="switch" aria-checked="${c.enabled}" aria-label="Recolor with my music"><i></i></button></div>
     ${c.enabled ? `
     <div class="seg mt">${sources.map(([v, l]) => `<button class="${src === v ? 'on' : ''}" data-act="musicSource" data-v="${v}">${l}</button>`).join('')}</div>
     ${src === 'phone' ? phoneHTML() : src === 'spotify' ? (SPOTIFY_CLIENT_ID
-      ? `<p class="tiny muted mt-s">Ledger doesn't play music: it follows what's playing in the Spotify app. Spotify only allows accounts the Ledger owner has added (Spotify Developer Dashboard → User Management, up to 5 people), and the owner needs Premium.${Native.isApp ? ' “Any app” has no such limit.' : ''}</p>${sp ? `<button class="btn ghost wide mt-s" data-act="spotifyOff">Disconnect Spotify</button>` : `<button class="btn spotify wide mt-s" data-act="spotifyOn">${icon('play', 'sm')} Connect Spotify</button>`}`
+      ? `<p class="tiny muted mt-s">Zelum doesn't play music: it follows what's playing in the Spotify app. Spotify only allows accounts the Zelum owner has added (Spotify Developer Dashboard → User Management, up to 5 people), and the owner needs Premium.${Native.isApp ? ' “Any app” has no such limit.' : ''}</p>${sp ? `<button class="btn ghost wide mt-s" data-act="spotifyOff">Disconnect Spotify</button>` : `<button class="btn spotify wide mt-s" data-act="spotifyOn">${icon('play', 'sm')} Connect Spotify</button>`}`
       : `<p class="tiny muted mt-s">Spotify needs a one-time developer setup (and Premium). Ask Claude to finish it, or use Last.fm for free.</p>`)
       : `<p class="tiny muted mt-s">Connect Spotify to Last.fm once (last.fm → Settings → Applications → Spotify). On Android, a free scrobbler app adds YouTube Music, Apple Music and others.</p>
       <div class="form-grid mt-s">
@@ -311,10 +312,10 @@ function musicSettingsHTML() {
 }
 
 const MUSIC_ACT = {
-  musicToggle: () => { S.settings.music.enabled = !S.settings.music.enabled; save(); Music.start(); rerenderAppearance(); render(); },
+  musicToggle: () => { if (!S.settings.music.enabled && !requirePlan('music')) return; S.settings.music.enabled = !S.settings.music.enabled; save(); Music.start(); rerenderAppearance(); render(); },
   musicSource: d => { S.settings.music.source = d.v; save(); Music.track = null; Music.lastId = ''; Music.clear(); Music.start(); rerenderAppearance(); },
   musicAccess: async () => {
-    try { await Native.p.ledger.musicSettings({ open: 'access' }); } catch (e) { toast('Open Settings → Notifications → Notification access → Ledger'); }
+    try { await Native.p.ledger.musicSettings({ open: 'access' }); } catch (e) { toast('Open Settings → Notifications → Notification access → Zelum'); }
   },
   musicAppInfo: () => Native.p.ledger.musicSettings({ open: 'appinfo' }).catch(() => { }),
   openPlayer: () => Native.p.ledger.openPlayer().catch(() => { }),
@@ -334,12 +335,12 @@ document.addEventListener('visibilitychange', () => {
   else if (Music.ready()) Music.poll();
 });
 
-/* Full-screen "Return to Ledger" step used when a sign-in started in the Android app finishes in Chrome */
+/* Full-screen "Return to Zelum" step used when a sign-in started in the Android app finishes in Chrome */
 function handBack(url, what) {
   const el = document.createElement('div');
   el.className = 'handback';
   el.innerHTML = `<div class="handback-card glass"><div class="onb-check">${icon('check')}</div><h2>${esc(what)} connected</h2>
-    <p class="muted small">Tap below to go back to the Ledger app.</p><a class="btn primary wide mt" href="${esc(url)}">Return to Ledger</a></div>`;
+    <p class="muted small">Tap below to go back to the Zelum app.</p><a class="btn primary wide mt" href="${esc(url)}">Return to Zelum</a></div>`;
   document.body.appendChild(el);
   setTimeout(() => { location.href = url; }, 250);
 }

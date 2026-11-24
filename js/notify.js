@@ -1,8 +1,8 @@
-/* LEDGER — notifications.
+/* ZELUM — notifications.
    • Banners: iOS-style liquid-glass notifications that drop from the top (swipe up to dismiss, tap to open).
    • Live Activity: a floating "island" during workouts — elapsed time, next set, rest ring; tap to expand.
    • Reminders: habits (each can have a time), workout, water and the daily verse.
-     Shown as banners while Ledger is open, and as system notifications while it's in the background.
+     Shown as banners while Zelum is open, and as system notifications while it's in the background.
      (Exact reminders while the app is fully closed need the Android app or a push server — see README.) */
 
 /* ---------- Banners ---------- */
@@ -14,7 +14,7 @@ function notify({ title, body = '', ic = 'bell', tone = 'accent', art = '', soun
   el.className = 'banner';
   el.style.setProperty('--tc', TONES[tone] || tone);
   el.innerHTML = `<span class="bn-ic">${art ? `<img src="${esc(art)}" alt="">` : icon(ic)}</span>
-    <span class="bn-body"><span class="bn-top"><b>LEDGER</b><span>now</span></span><b class="bn-title">${esc(title)}</b>${body ? `<span class="bn-text">${esc(body)}</span>` : ''}</span>`;
+    <span class="bn-body"><span class="bn-top"><b>ZELUM</b><span>now</span></span><b class="bn-title">${esc(title)}</b>${body ? `<span class="bn-text">${esc(body)}</span>` : ''}</span>`;
   const close = () => { el.classList.add('out'); setTimeout(() => el.remove(), 380); };
   let y0 = null, dy = 0;
   el.addEventListener('pointerdown', e => { y0 = e.clientY; dy = 0; el.setPointerCapture(e.pointerId); el.style.transition = 'none'; });
@@ -43,10 +43,10 @@ async function sysNotify(title, body, tag, to = '') {
 }
 async function askNotifPermission() {
   if (Native.isApp) return Native.ensurePermission();
-  if (!('Notification' in window)) { notify({ title: 'Notifications aren\'t supported here', body: 'Install Ledger to your home screen to enable them.', ic: 'info', tone: 'danger', system: false }); return false; }
+  if (!('Notification' in window)) { notify({ title: 'Notifications aren\'t supported here', body: 'Install Zelum to your home screen to enable them.', ic: 'info', tone: 'danger', system: false }); return false; }
   if (Notification.permission === 'granted') return true;
   const r = await Notification.requestPermission();
-  if (r !== 'granted') notify({ title: 'Notifications are blocked', body: 'Allow them for Ledger in your browser or phone settings.', ic: 'info', tone: 'danger', system: false });
+  if (r !== 'granted') notify({ title: 'Notifications are blocked', body: 'Allow them for Zelum in your browser or phone settings.', ic: 'info', tone: 'danger', system: false });
   return r === 'granted';
 }
 const notifState = () => Native.isApp ? 'granted' : !('Notification' in window) ? 'unsupported' : Notification.permission;
@@ -111,7 +111,7 @@ function todaysReminders() { return remindersFor(today()); }
 function remindersFor(k) {
   const n = S.settings.notif, out = [], isToday = k === today();
   if (!n || !n.enabled) return out;
-  if (n.verse.on && !S.claimed[`done:m:${k}:faith`]) {
+  if (faithOn() && n.verse.on && !S.claimed[`done:m:${k}:faith`]) {
     const v = verseOfDay(k); out.push({ key: 'verse', at: toMin(n.verse.time), title: `Verse of the day · ${v.ref}`, body: v.text.length > 110 ? v.text.slice(0, 108) + '…' : v.text, ic: 'cross', tone: 'faith', to: 'today' });
   }
   if (n.workout.on && isTrainingDay(k) && !workoutsOn(k).length && !(isToday && S.active)) {
@@ -152,16 +152,17 @@ function notifCardHTML() {
   const n = S.settings.notif, perm = notifState();
   const row = (label, sub, k, on, extra = '') => `<div class="nrow"><div class="grow"><b class="small">${label}</b><span class="tiny muted">${sub}</span></div>${extra}<button class="switch ${on ? 'on' : ''}" data-act="notifToggle" data-k="${k}" role="switch" aria-checked="${on}" aria-label="${label}"><i></i></button></div>`;
   const habitsWithTimes = activeHabits().filter(h => h.remind && h.type !== 'quit');
-  return `<div class="row between center"><div><b>Notifications</b><p class="tiny muted">${perm === 'granted' ? 'Allowed on this device' : perm === 'denied' ? 'Blocked — allow Ledger in your browser/phone settings' : perm === 'unsupported' ? 'Install Ledger to your home screen to use them' : 'Not allowed yet'}</p></div>
+  return `<div class="row between center"><div><b>Notifications</b><p class="tiny muted">${perm === 'granted' ? 'Allowed on this device' : perm === 'denied' ? 'Blocked — allow Zelum in your browser/phone settings' : perm === 'unsupported' ? 'Install Zelum to your home screen to use them' : 'Not allowed yet'}</p></div>
       <button class="switch ${n.enabled ? 'on' : ''}" data-act="notifToggle" data-k="enabled" role="switch" aria-checked="${n.enabled}" aria-label="Notifications"><i></i></button></div>
     ${n.enabled ? `<div class="nlist mt">
       ${row('Workout reminder', 'On training days, if you haven\'t trained yet', 'workout', n.workout.on, `<input class="inp time" type="time" value="${n.workout.time}" data-change="notifTime" data-k="workout">`)}
       ${row('Water', `Every ${n.water.every} h between ${fmtHM(n.water.from)} and ${fmtHM(n.water.to)}, only if you're behind`, 'water', n.water.on, `<select class="inp time" data-change="notifEvery">${[1, 1.5, 2, 3].map(h => `<option value="${h}" ${n.water.every == h ? 'selected' : ''}>${h} h</option>`).join('')}</select>`)}
-      ${row('Verse of the day', 'Morning Scripture', 'verse', n.verse.on, `<input class="inp time" type="time" value="${n.verse.time}" data-change="notifTime" data-k="verse">`)}
+      ${!faithOn() ? '' : row('Verse of the day', 'Morning Scripture', 'verse', n.verse.on, `<input class="inp time" type="time" value="${n.verse.time}" data-change="notifTime" data-k="verse">`)}
       ${row('Habit reminders', habitsWithTimes.length ? habitsWithTimes.map(h => `${esc(h.name)} ${fmtHM(h.remind)}`).join(' · ') : 'Set a time on any habit (edit habit → Reminder)', 'habits', n.habits)}
+      ${Native.isApp && (Native.exact === 'granted' || Native.exact === 'denied') ? `<div class="nrow"><div class="grow"><b class="small">Exact times</b><span class="tiny muted">${Native.exact === 'granted' ? 'Reminders arrive at the exact minute' : 'Off: Android may hold reminders a few minutes to save battery. Turn on in Alarms &amp; reminders'}</span></div><button class="switch ${Native.exact === 'granted' ? 'on' : ''}" data-act="notifExact" role="switch" aria-checked="${Native.exact === 'granted'}" aria-label="Exact times"><i></i></button></div>` : ''}
     </div>` : ''}
     <div class="row gap mt"><button class="btn soft grow" data-act="notifTest">${icon('bell', 'sm')} Send a test</button></div>
-    <p class="tiny muted mt-s">${Native.isApp ? 'Reminders are scheduled on your phone and arrive on time, even when Ledger is closed. During workouts a live notification shows your timer and next set.' : 'While Ledger is open you\'ll see glass banners. When it\'s in the background your phone shows them as normal notifications. Exact reminders while Ledger is fully closed come with the Android app.'}</p>`;
+    <p class="tiny muted mt-s">${Native.isApp ? 'Reminders are scheduled on your phone and arrive even when Zelum is closed. During workouts a live notification shows your timer and next set.' : 'While Zelum is open you\'ll see glass banners. When it\'s in the background your phone shows them as normal notifications. Exact reminders while Zelum is fully closed come with the Android app.'}</p>`;
 }
 
 const NOTIF_ACT = {
@@ -178,11 +179,12 @@ const NOTIF_ACT = {
     else n[d.k].on = !n[d.k].on;
     save(); render(); SFX.play('tap');
   },
+  notifExact: () => { SFX.play('tap'); return Native.allowExact(); },
   notifTest: async () => {
     if (Native.isApp) return Native.testNotification();
     await askNotifPermission();
-    notify({ title: 'Ledger notifications are on', body: 'This is how reminders, rest timers and milestones will look.', ic: 'bell', tone: 'accent', system: false, sound: 'check' });
-    setTimeout(() => sysNotify('Ledger · test', 'And this is a system notification, for when Ledger is in the background.', 'test', 'today'), 1200);
+    notify({ title: 'Zelum notifications are on', body: 'This is how reminders, rest timers and milestones will look.', ic: 'bell', tone: 'accent', system: false, sound: 'check' });
+    setTimeout(() => sysNotify('Zelum · test', 'And this is a system notification, for when Zelum is in the background.', 'test', 'today'), 1200);
   },
 };
 const NOTIF_CHG = {

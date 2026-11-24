@@ -1,4 +1,4 @@
-/* LEDGER — state, persistence, dates, XP ledger. Data stays on this device (localStorage). */
+/* ZELUM — state, persistence, dates, XP ledger. Data stays on this device (localStorage). */
 
 const STORE_KEY = 'ledger.v1';
 const OLD_KEYS = ['ascend.v1'];   // data saved before the app was renamed
@@ -34,7 +34,7 @@ function defaultState() {
     bodyweight: [],        // { date, kg }
     food: {},              // date -> { water: ml, items: [{id, foodId, name, qty, kcal, p, meal}] }
     customFoods: [],
-    habits: DEFAULT_HABITS.map(h => normHabit({ ...h, created: today() })),
+    habits: DEFAULT_HABITS.filter(h => !h.faith).map(h => normHabit({ ...h, created: today() })),   // Faith mode adds the rest
     habitLog: {},          // date -> [habitId] (yes/no habits)
     habitVals: {},         // date -> {habitId: amount} (amount habits)
     xpLog: {},             // key -> [amount, timestamp, reason]
@@ -46,7 +46,10 @@ function defaultState() {
     routines: [],          // { id, name, plan, day, icon, desc, items:[{ex, sets, lo, hi, rest}] }
     plan: null,            // gym plan: { split, built, days:[routineId] } — the rotation
     deload: null,          // { start, until } — a lighter recovery week
-    settings: { glassMl: 250, restSec: 90, sound: true, waterTarget: 0, kcalTarget: 0, proteinTarget: 0,
+    seenVersion: '',       // last release shown in What's new (whatsnew.js)
+    founder: false,        // used the app before plans existed: Pro for life (plans.js)
+    sub: null,             // subscription as Google Play / RevenueCat last reported it (plans.js)
+    settings: { glassMl: 250, restSec: 90, sound: true, waterTarget: 0, kcalTarget: 0, proteinTarget: 0, faith: false,
       theme: { preset: 'midnight', colors: {}, glow: 0.55, blur: 26 },
       music: { enabled: false, source: 'phone', lfUser: '', lfKey: '' },   // 'phone' = any player (Android app); the web uses Last.fm
       notif: { enabled: false, workout: { on: true, time: '17:00' }, water: { on: true, every: 2, from: '08:00', to: '20:00' }, verse: { on: true, time: '07:00' }, habits: true } },
@@ -67,6 +70,10 @@ function load() {
 }
 function migrate(s) {
   const d = defaultState();
+  // Faith mode came later (v1.12): anyone who already used the app keeps the faith content they had
+  if (s.settings && s.settings.faith === undefined) s.settings.faith = !!s.onboarded;
+  // Plans came in v1.13: everyone who already used the app is a Founder (Pro for life)
+  if (s.founder === undefined) s.founder = !!s.onboarded;
   for (const k of Object.keys(d)) if (s[k] === undefined) s[k] = d[k];
   s.settings = { ...d.settings, ...s.settings };
   s.settings.theme = { ...d.settings.theme, ...(s.settings.theme || {}) };

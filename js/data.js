@@ -1,4 +1,4 @@
-/* LEDGER — content library: exercises, skills, foods, verses, quotes, levels, missions.
+/* ZELUM — content library: exercises, skills, foods, verses, quotes, levels, missions.
    Everything here is static data; app state lives in store.js. */
 
 /* ---------- Movement families & progression ladders ----------
@@ -288,7 +288,7 @@ const QUOTES = [
   'Earn the skill. No shortcuts on the way up.',
   'Strength is a byproduct of showing up.',
   'Bodyweight is the oldest barbell in the world.',
-  'Feed the body, train the body, rest the body, trust God with the results.',
+  'Feed the body, train the body, rest the body, trust the process.',
   'You\'re not starting over. You\'re starting stronger.',
   'Grip the bar like you mean it.',
 ];
@@ -301,14 +301,14 @@ const TITLES = [
 
 /* ---------- Habits ---------- */
 const DEFAULT_HABITS = [
-  { id: 'pray',     name: 'Morning prayer',          icon: 'cross', cat: 'faith' },
-  { id: 'word',     name: 'Read Scripture',          icon: 'book',  cat: 'faith' },
+  { id: 'pray',     name: 'Morning prayer',          icon: 'cross', cat: 'faith', faith: true },   // faith: only in Faith mode
+  { id: 'word',     name: 'Read Scripture',          icon: 'book',  cat: 'faith', faith: true },
   { id: 'train',    name: 'Train or practice a skill', icon: 'bolt', auto: 'train', cat: 'body' },
   { id: 'water',    name: 'Drink water',             icon: 'drop',  auto: 'water', cat: 'fuel' },
   { id: 'protein',  name: 'Hit protein goal',        icon: 'flame', auto: 'protein', cat: 'fuel' },
   { id: 'stretch',  name: 'Stretch / mobility 10 min', icon: 'leaf', cat: 'body' },
   { id: 'sleep',    name: 'Slept 7+ hours',          icon: 'moon',  cat: 'body' },
-  { id: 'grateful', name: 'Gratitude: 3 things',     icon: 'heart', cat: 'faith' },
+  { id: 'grateful', name: 'Gratitude: 3 things',     icon: 'heart', cat: 'mind' },
 ];
 /* Habit categories → which theme color tints them */
 const HABIT_CATS = {
@@ -332,7 +332,7 @@ const THEME_ROLES = [
   ['protein', 'Protein',           'Protein ring'],
   ['faith',   'Faith & verses',    'Scripture and prayer'],
   ['danger',  'Warnings',          'Delete, reset'],
-  ['logo',    'Logo',              'The cross-L mark'],
+  ['logo',    'Logo',              'The Z mark'],
   ['logoBg',  'Logo background',   'Behind the mark'],
 ];
 const THEMES = {
@@ -348,7 +348,7 @@ const THEMES = {
 /* ---------- Achievements ---------- */
 const ACHIEVEMENTS = [
   { id: 'first_workout', name: 'First Step',      desc: 'Log your first workout',       icon: 'bolt' },
-  { id: 'w10',           name: 'Faithful in Little', desc: 'Log 10 workouts',          icon: 'shield' },
+  { id: 'w10',           name: 'Showing Up',      desc: 'Log 10 workouts',          icon: 'shield' },
   { id: 'w50',           name: 'Iron Will',       desc: 'Log 50 workouts',              icon: 'crown' },
   { id: 'w100',          name: 'Centurion',       desc: 'Log 100 workouts',             icon: 'crown' },
   { id: 'first_pr',      name: 'New Heights',     desc: 'Set a personal record',        icon: 'trophy' },
@@ -357,8 +357,8 @@ const ACHIEVEMENTS = [
   { id: 'streak30',      name: 'Rooted',          desc: '30-day active streak',         icon: 'flame' },
   { id: 'skill1',        name: 'Skill Unlocked',  desc: 'Complete a skill step',        icon: 'star' },
   { id: 'skill10',       name: 'Artisan',         desc: 'Complete 10 skill steps',      icon: 'star' },
-  { id: 'hydrated7',     name: 'Living Water',    desc: 'Hit your water goal 7 days',   icon: 'drop' },
-  { id: 'protein7',      name: 'Daily Bread',     desc: 'Hit your protein goal 7 days', icon: 'flame' },
+  { id: 'hydrated7',     name: 'Well Hydrated',   desc: 'Hit your water goal 7 days',   icon: 'drop' },
+  { id: 'protein7',      name: 'Protein Week',    desc: 'Hit your protein goal 7 days', icon: 'flame' },
   { id: 'reps1000',      name: 'Thousand Reps',   desc: '1,000 total reps logged',      icon: 'bolt' },
   { id: 'reps10000',     name: 'Ten Thousand',    desc: '10,000 total reps logged',     icon: 'bolt' },
   { id: 'lvl5',          name: 'Squire',         desc: 'Reach level 5',                icon: 'up' },
@@ -367,9 +367,6 @@ const ACHIEVEMENTS = [
   { id: 'levelup_ex',    name: 'Next Progression', desc: 'Advance an exercise progression', icon: 'mountain' },
   { id: 'goal_done',     name: 'Quest Complete',  desc: 'Complete a Main Quest',        icon: 'target' },
   { id: 'weighin4',      name: 'Know Thyself',    desc: 'Log your weight 4 times',      icon: 'scale' },
-  { id: 'gym1',          name: 'Iron Initiate',   desc: 'Finish your first gym workout', icon: 'dumbbell' },
-  { id: 'ton10',         name: 'Ten Tonnes',      desc: 'Lift 10,000 kg in total',      icon: 'dumbbell' },
-  { id: 'ton100',        name: 'Hundred Tonnes',  desc: 'Lift 100,000 kg in total',     icon: 'crown' },
   { id: 'gym1',          name: 'Iron Initiate',   desc: 'Finish your first gym workout', icon: 'dumbbell' },
   { id: 'ton10',         name: 'Ten Tonnes',      desc: 'Lift 10,000 kg in total',      icon: 'dumbbell' },
   { id: 'ton100',        name: 'Hundred Tonnes',  desc: 'Lift 100,000 kg in total',     icon: 'crown' },

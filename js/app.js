@@ -1,6 +1,6 @@
-/* LEDGER — views, navigation and actions. */
+/* ZELUM — views, navigation and actions. */
 
-const VERSION = '1.10.0';
+const VERSION = '1.13.0';
 /* Browser engine version (the Android app's WebView updates separately from Chrome), shown under Me for support */
 const engineTag = () => { const m = navigator.userAgent.match(/Chrome\/(\d+)/); return m ? ` · ${/LedgerAndroid|; wv\)/.test(navigator.userAgent) ? 'WebView' : 'Chrome'} ${m[1]}` : ''; };
 const NAV = [
@@ -33,14 +33,14 @@ function flushLevelUp() {
   setTimeout(() => showLevelUp(lvl), 500);
 }
 function showLevelUp(lvl) {
-  const v = VERSES[hashStr('lvl' + lvl) % VERSES.length];
+  const v = dailyLine('lvl' + lvl);
   const ri = rankIndex(lvl), newRank = RANKS[ri].lvl === lvl;
   openSheet(`<div class="levelup">
     <div class="lu-glow"></div>
     <p class="eyebrow gold">${newRank ? 'New rank unlocked' : 'Level up'}</p>
     ${newRank ? `<div class="lu-shield">${shieldSVG(ri, 150)}</div><h2>${esc(RANKS[ri].title)}</h2><p class="gold small" style="margin:-8px 0 12px">${esc(RANKS[ri].shield)} · Level ${lvl}</p>`
       : `<div class="lu-num">${lvl}</div><h2>${esc(titleFor(lvl))}</h2>`}
-    <p class="verse-text">“${esc(v.text)}”</p><p class="muted small">${esc(v.ref)}</p>
+    ${lineHTML(v)}
     <button class="btn primary wide mt" data-act="closeSheet">Keep climbing</button></div>`, { cls: 'center' });
   burst(innerWidth / 2, innerHeight / 2, 40); SFX.play('levelUp'); haptic([30, 40, 60]);
 }
@@ -50,17 +50,25 @@ function go(r) {
   if (r === 'skills') { trainTab = 'skills'; r = 'train'; }
   if (!NAV.find(n => n.id === r) && r !== 'path') r = 'today';
   if (r === 'habits' && route !== 'habits') habitDay = today();
+  const same = route === r;
   route = r; clearFx();
   if (location.hash !== '#' + r) history.replaceState(null, '', '#' + r);
-  render(true);
-  document.querySelector('.nav-btn.on')?.classList.add('just');
+  const swap = () => { render(true); document.querySelector('.nav-btn.on')?.classList.add('just'); };
+  // A short crossfade between screens. The browser snapshots only what is on screen and fades the two pictures
+  // on the GPU, so it stays smooth at 120 Hz. Skipped for reduced motion, Smooth graphics and software drawing.
+  if (!same && document.startViewTransition && !document.hidden && Gfx.motion()) {
+    document.documentElement.classList.add('vt-tab');
+    const t = document.startViewTransition(swap);
+    t.ready.catch(() => { });   // skipped (e.g. the app went to the background): the screen still changes
+    t.finished.catch(() => { }).finally(() => document.documentElement.classList.remove('vt-tab'));
+  } else swap();
 }
 function refresh(flush = true) { syncDailyXP(); checkAchievements(); save(); render(); if (flush) flushLevelUp(); }
 
 /* A new screen (navigation, or a fresh state from the cloud/backup) is built from scratch so its
    entry animation plays; any other update on the same screen is patched in place (morphHTML). */
 function paintView(v, key, html, fresh) {
-  if (fresh || v.dataset.route !== key) v.innerHTML = html; else morphHTML(v, html);
+  if (fresh || v.dataset.route !== key) { v.innerHTML = html; v.__html = html; } else morphHTML(v, html);
   if (v.dataset.route !== key) v.dataset.route = key;
 }
 /* The screen's SVG gradient ids restart from zero on every render, so an unchanged shield or figure keeps
@@ -89,8 +97,12 @@ let fxQueue = [];
 const fx = (sel, cls) => fxQueue.push([sel, cls]);
 function renderNav() {
   const claim = S.onboarded ? claimableCount() : 0;
-  morphHTML(document.getElementById('nav'), `
-    <div class="brand">${logoSVG({ size: 34 })}<span>LEDGER</span></div>
+  const ni = Math.max(0, NAV.findIndex(n => n.id === (route === 'path' ? 'me' : route)));
+  const nav = document.getElementById('nav');
+  nav.style.setProperty('--ni', ni); nav.style.setProperty('--nc', NAV.length);
+  morphHTML(nav, `
+    <i class="nav-pill" aria-hidden="true"></i>
+    <div class="brand">${logoSVG({ size: 34 })}<span>ZELUM</span></div>
     ${NAV.map(n => `<button class="nav-btn ${route === n.id || (route === 'path' && n.id === 'me') ? 'on' : ''}" data-go="${n.id}" aria-label="${n.label}">
       <span class="nav-ic">${icon(n.icon)}${n.id === 'today' && claim ? `<b class="dot">${claim}</b>` : ''}${n.id === 'train' && S.active ? '<b class="dot live"></b>' : ''}</span><span class="nav-l">${n.label}</span></button>`).join('')}
     <button class="nav-btn coach-side" data-act="coach"><span class="nav-ic">${icon('chat')}</span><span class="nav-l">Coach</span></button>`);
@@ -134,12 +146,12 @@ function viewToday() {
 
   <div class="grid mt">
     ${questCard()}
-    ${card(`
+    ${faithOn() ? card(`
       ${cardHead('Verse of the day', faithDone ? `<span class="chip green">${icon('check', 'xs')} Amen</span>` : '', 'cross')}
       <p class="verse-text">“${esc(v.text)}”</p>
       <p class="verse-ref">${esc(v.ref)}</p>
       <p class="verse-note">${esc(v.note)}</p>
-      ${faithDone ? '' : `<button class="btn soft wide mt" data-act="amen">${icon('heart', 'sm')} I've read & prayed — Amen</button>`}`, 'verse-card')}
+      ${faithDone ? '' : `<button class="btn soft wide mt" data-act="amen">${icon('heart', 'sm')} I've read & prayed — Amen</button>`}`, 'verse-card') : ''}
     ${trainTodayCard()}
     ${missionsCard()}
     ${card(`<p class="quote">${esc(quoteOfDay())}</p>`, 'quote-card')}
@@ -148,7 +160,7 @@ function viewToday() {
 
 function questCard() {
   const g = S.goal;
-  if (!g) return card(`${cardHead('Main Quest', '', 'target')}<p class="muted">Everything in Ledger points to one goal. Choose yours.</p><button class="btn primary wide mt" data-act="pickGoal">Choose Main Quest</button>`, 'quest-card');
+  if (!g) return card(`${cardHead('Main Quest', '', 'target')}<p class="muted">Everything in Zelum points to one goal. Choose yours.</p><button class="btn primary wide mt" data-act="pickGoal">Choose Main Quest</button>`, 'quest-card');
   const gp = goalProgress(), dl = goalDaysLeft();
   const action = g.type === 'skill' ? `<button class="btn soft" data-act="openSkill" data-skill="${g.skill}">Open skill tree</button>`
     : g.type === 'reps' ? `<button class="btn soft" data-act="maxTest">Log a max test</button>`
@@ -181,11 +193,11 @@ function trainTodayCard() {
     return card(`${cardHead('Trained today', `<span class="chip green">${icon('check', 'xs')} Done</span>`, 'bolt')}
       <h2 class="mt-s">${esc(w.name)}</h2>
       <p class="muted">${w.mins} min · ${sum(w.entries.map(e => doneSets(e).length))} sets · ${vol.reps} reps${w.prs.length ? ` · ${w.prs.length} PR${w.prs.length > 1 ? 's' : ''} 🏆` : ''}</p>
-      <p class="small mt">Now recover: protein, water, sleep. ${esc(VERSE_REST.ref)}: “${esc(VERSE_REST.text)}”</p>`, 'train-card');
+      <p class="small mt">Now recover: protein, water, sleep.${faithOn() ? ` ${esc(VERSE_REST.ref)}: “${esc(VERSE_REST.text)}”` : ' Growth happens while you rest.'}</p>`, 'train-card');
   }
   const tpl = nextTemplate(), T = tplInfo(tpl), w = buildWorkout(tpl), trainDay = isTrainingDay();
   return card(`${cardHead(trainDay ? 'Today\'s training' : 'Rest day', trainDay ? '<span class="chip blue">Training day</span>' : '<span class="chip">Recover</span>', trainDay ? 'bolt' : 'moon')}
-    ${trainDay ? '' : `<p class="muted small">“${esc(VERSES[22].text)}” — ${VERSES[22].ref}. Feeling fresh? You can still train.</p>`}
+    ${trainDay ? '' : `<p class="muted small">${faithOn() ? `“${esc(VERSES[22].text)}” — ${VERSES[22].ref}.` : 'Recovery is part of the plan.'} Feeling fresh? You can still train.</p>`}
     <div class="row center gap mt-s"><span class="tpl-ic">${icon(T.icon)}</span><div><h2>${esc(T.name)}</h2><p class="muted small">${esc(T.desc)}</p></div></div>
     <ul class="ex-preview">${w.entries.map(e => { const ex = getEx(e.ex); return `<li><span>${esc(entryName(e))}</span><span class="muted">${isGym(ex) ? `${e.sets.length} × ${e.sets[0].t}${unitOf(ex)}${e.sets[0].kg ? ` @ ${e.sets[0].kg} kg` : ''}` : `${e.sets.map(s => s.t).join(' · ')}${unitOf(ex)}`}</span></li>`; }).join('')}</ul>
     <button class="btn primary wide mt" data-act="start" data-tpl="${tpl}">${icon('play', 'sm')} Start ${esc(T.name)}</button>`, 'train-card');
@@ -222,7 +234,7 @@ function appearanceHTML() {
     <div class="slider-row"><label><span>Glass blur</span><span id="blurVal">${t.blur ?? 26}px</span></label>
       <input type="range" min="0" max="50" value="${t.blur ?? 26}" data-input="themeBlur" aria-label="Glass blur"></div>
     <h4 class="mt">${icon('palette', 'sm')} Colors</h4>
-    <div class="colors mt-s">${THEME_ROLES.map(([k, name, desc]) => `<label class="color-row">
+    <div class="colors mt-s">${THEME_ROLES.filter(([k]) => k !== 'faith' || faithOn()).map(([k, name, desc]) => `<label class="color-row">
       <input type="color" value="${c[k]}" data-input="themeColor" data-change="themeColorDone" data-k="${k}" aria-label="${name}">
       <span class="grow"><b class="small">${name}</b><br><span class="tiny muted">${desc}</span></span><span class="hex" id="hex-${k}">${c[k].toUpperCase()}</span></label>`).join('')}</div>
     ${musicSettingsHTML()}`;
@@ -246,7 +258,7 @@ function waterMini() {
 function viewTrain() {
   if (S.active) return viewActive();
   const gym = gymMode(), tabs = trainTabs();
-  const body = trainTab === 'skills' ? skillsContent() : trainTab === 'coach' ? coachTab() : trainTab === 'library' ? libraryTab() : trainTab === 'records' ? recordsTab()
+  const body = trainTab === 'skills' ? skillsContent() : trainTab === 'coach' ? (can('coach') ? coachTab() : lockedHTML('coach')) : trainTab === 'library' ? libraryTab() : trainTab === 'records' ? (can('records') ? recordsTab() : lockedHTML('records'))
     : gym ? gymWorkoutsTab() : calWorkoutsTab();
   return trainHero() + tabs + body;
 }
@@ -285,7 +297,7 @@ function viewActive() {
   return `<header class="page-head sticky-head glass">
       <div><p class="eyebrow"><span class="live-dot"></span> <span data-elapsed></span></p><h1 class="h-mid">${esc(w.name)}</h1></div>
       <button class="btn primary" data-act="finish">Finish</button></header>
-    <section class="card glass dedicate"><p class="small"><b>Dedicate this session.</b> <i>“${esc(VERSES[15].text)}” — ${VERSES[15].ref}</i></p></section>
+    ${faithOn() ? `<section class="card glass dedicate"><p class="small"><b>Dedicate this session.</b> <i>“${esc(VERSES[15].text)}” — ${VERSES[15].ref}</i></p></section>` : ''}
     ${w.entries.map((e, ei) => {
       const ex = getEx(e.ex); if (!ex) return '';
       const u = unitOf(ex), loadable = ex.load, gym = isGym(ex), rest = e.rest || S.settings.restSec;
@@ -350,7 +362,7 @@ function weeklyCoachCard() {
   if (!R.sessions && !R.sessionsPrev) return '';
   const pct = (a, b) => b ? Math.round((a / b - 1) * 100) : null, dv = pct(R.vol, R.volPrev);
   const delta = (a, b, unit = '') => { const d = a - b; return b || a ? `<span class="tiny ${d > 0 ? 'green-t' : d < 0 ? 'red-t' : 'muted'}">${d > 0 ? '▲' : d < 0 ? '▼' : '='} ${Math.abs(d)}${unit}</span>` : ''; };
-  const verdict = dv === null ? 'First week on record — next week Ledger compares the two.'
+  const verdict = dv === null ? 'First week on record — next week Zelum compares the two.'
     : dv > 15 ? 'Big jump in volume. Great work — sleep and eat well so it sticks.'
     : dv >= 0 ? 'Steady progress. This is exactly how strength is built.'
     : dv > -20 ? 'A bit less than last week. Fine if you were tired — aim for your planned days.'
@@ -429,7 +441,7 @@ function viewFuel() {
       <button class="btn ghost sm mt-s" data-act="addFood" data-meal="${m}">${icon('plus', 'xs')} Add food</button>`);
   }).join('')}
   </div>
-  ${card(`<p class="verse-text small">“${esc(VERSE_FOOD.text)}”</p><p class="verse-ref">${VERSE_FOOD.ref}</p>`, 'verse-card')}`;
+  ${faithOn() ? card(`<p class="verse-text small">“${esc(VERSE_FOOD.text)}”</p><p class="verse-ref">${VERSE_FOOD.ref}</p>`, 'verse-card') : ''}`;
 }
 
 function foodSheet() {
@@ -471,6 +483,7 @@ function viewMe() {
     </div>
     <button class="btn soft wide mt" data-go="path">${icon('crown', 'sm')} Path to King · ${esc(RANKS[Math.min(RANKS.length - 1, rankIndex(li.lvl) + 1)].title)} next</button>
   </section>
+  ${card(planCardHTML(), 'plan-card-me')}
   ${accountCard()}
   <div class="stats">
     <div class="stat glass"><b>${S.workouts.length}</b><span>Workouts</span></div>
@@ -488,7 +501,7 @@ function viewMe() {
     ${card(`${cardHead('Badges', `<span class="tiny muted">${nBadges}/${ACHIEVEMENTS.length}</span>`, 'trophy')}
       <div class="badges">${ACHIEVEMENTS.map(a => `<div class="badge ${S.badges[a.id] ? 'on' : ''}" title="${esc(a.desc)}"><span>${icon(a.icon)}</span><b>${esc(a.name)}</b><small>${esc(a.desc)}</small></div>`).join('')}</div>`, 'span2')}
     ${card(notifCardHTML(), 'notif-card')}
-    ${card(`${cardHead('Appearance', '', 'palette')}<p class="small muted" style="margin-bottom:12px">Choose a palette, then tune any color — accent, glows, XP, streak flames, water, food, faith.</p><div id="appearanceBody">${appearanceHTML()}</div>`, 'span2')}
+    ${card(`${cardHead('Appearance', '', 'palette')}<p class="small muted" style="margin-bottom:12px">Choose a palette, then tune any color — accent, glows, XP, streak flames, water, food${faithOn() ? ', faith' : ''}.</p><div id="appearanceBody">${appearanceHTML()}</div>`, 'span2')}
     ${card(`${cardHead('Settings', '', 'settings')}
       <button class="btn soft wide" data-act="trainSetup">${icon('dumbbell', 'sm')} Training setup — discipline, goal, level, days, equipment</button>
       <div class="form-grid mt">
@@ -501,9 +514,12 @@ function viewMe() {
         <label class="field"><span>Water ml <em>(0 = auto)</em></span><input class="inp" type="number" inputmode="numeric" value="${S.settings.waterTarget}" data-change="setting" data-k="waterTarget"></label>
         <label class="field"><span>Sound effects</span><select data-change="setting" data-k="sound"><option value="1" ${S.settings.sound ? 'selected' : ''}>On</option><option value="0" ${S.settings.sound ? '' : 'selected'}>Off</option></select></label>
         <label class="field"><span>Volume <em id="volVal">${Math.round((S.settings.volume ?? 0.7) * 100)}%</em></span><input type="range" min="0" max="100" value="${Math.round((S.settings.volume ?? 0.7) * 100)}" data-input="volume" data-change="volumeDone" aria-label="Volume"></label>
+        <label class="field"><span>Graphics</span><select data-change="gfx">${[['auto', 'Auto'], ['full', 'Full glass'], ['smooth', 'Smooth (less blur)']].map(([v, l]) => `<option value="${v}" ${Gfx.pref() === v ? 'selected' : ''}>${l}${v === 'auto' ? ` · now ${Gfx.lite() ? 'Smooth' : 'Full'}` : ''}</option>`).join('')}</select></label>
         ${Native.isApp && Native.renderMode ? `<label class="field"><span>Drawing mode <em>(Android)</em></span><select data-change="rendering">${RENDER_MODES.map(([v, l]) => `<option value="${v}" ${Native.renderMode === v ? 'selected' : ''}>${l}</option>`).join('')}</select></label>` : ''}
       </div>
-      ${Native.isApp && Native.renderMode ? '<p class="tiny muted mt-s">Seeing coloured dots or glitches while switching screens? Try another drawing mode; it applies instantly.</p>' : ''}`)}
+      ${Native.isApp && Native.renderMode ? '<p class="tiny muted mt-s">Seeing coloured dots or glitches while switching screens? Try another drawing mode; it applies instantly.</p>' : ''}
+      <div class="nrow faith-row mt"><div class="grow"><b class="small">Faith mode</b><span class="tiny muted">Adds a verse of the day, Scripture in workouts and level-ups, prayer and Bible habits, and a daily faith mission.</span></div>
+        <button class="switch ${faithOn() ? 'on' : ''}" data-act="faithToggle" role="switch" aria-checked="${faithOn()}" aria-label="Faith mode"><i></i></button></div>`)}
     ${card(`${cardHead('Your data', '', 'shield')}
       <p class="small muted">Everything is stored privately on this device and works offline. Export a backup regularly, and use it to move your progress between your phone and computer.</p>
       <div class="row gap mt wrap">
@@ -512,7 +528,7 @@ function viewMe() {
         ${installEvt ? `<button class="btn primary" data-act="install">${icon('download', 'sm')} Install app</button>` : ''}
         <button class="btn ghost danger-text" data-act="resetAll">${icon('trash', 'sm')} Reset</button>
       </div>
-      <p class="tiny muted mt">iPhone: open in Safari → Share → <b>Add to Home Screen</b>. Android/PC: browser menu → <b>Install app</b>. · v${VERSION}${engineTag()}</p>`)}
+      <p class="tiny muted mt">iPhone: open in Safari → Share → <b>Add to Home Screen</b>. Android/PC: browser menu → <b>Install app</b>. · <button class="link" data-act="whatsNew">v${VERSION} · What's new</button>${engineTag()}</p>`)}
   </div>`;
 }
 
@@ -524,9 +540,9 @@ function viewOnboarding() {
   const seg = (k, opts) => `<div class="seg">${opts.map(([v, l]) => `<button class="${String(d[k]) === String(v) ? 'on' : ''}" data-act="onbSet" data-k="${k}" data-v="${v}">${l}</button>`).join('')}</div>`;
   const num = (k, label, extra = '') => `<label class="field"><span>${label}</span><input class="inp" type="number" inputmode="decimal" name="${k}" value="${esc(d[k])}" data-input="onb" ${extra}></label>`;
   const steps = [
-    () => `<div class="onb-hero">${logoSVG({ size: 110, cls: 'onb-logo' })}<h1 class="display">LEDGER</h1>
-      <p class="lead">Every rep, every meal, every prayer — recorded.<br>Calisthenics. Discipline. Faith.</p>
-      <p class="verse-text mt">“Write the vision, and make it plain upon tables, that he may run that readeth it.”</p><p class="verse-ref">Habakkuk 2:2</p></div>`,
+    () => `<div class="onb-hero">${logoSVG({ size: 110, cls: 'onb-logo' })}<h1 class="display">ZELUM</h1>
+      <p class="lead">Every rep, every meal, every habit&nbsp;— tracked.<br>Calisthenics. Gym. Discipline.</p>
+      <p class="quote mt">Small daily wins compound into the impossible.</p></div>`,
     () => `<h2>How do you train?</h2><p class="muted">You can switch any time — both keep their own plan, and one coach reads them together.</p>
       <div class="choice-list mt">${[['cal', 'Calisthenics', 'Bodyweight: bars, floor, skills like the muscle-up and handstand. Progressions instead of plates.', 'train'], ['gym', 'Gym / weights', 'Barbells, dumbbells, cables and machines. A full plan with sets, reps, weights and rest.', 'dumbbell']].map(([v, l, x, ic]) =>
         `<button class="choice glass-btn ${d.discipline === v ? 'on' : ''}" data-act="onbSet" data-k="discipline" data-v="${v}"><b>${icon(ic, 'sm')} ${l}</b><span class="small muted">${x}</span></button>`).join('')}</div>`,
@@ -536,7 +552,7 @@ function viewOnboarding() {
         ${num('height', 'Height (cm)')}${num('weight', 'Weight (kg)', 'placeholder="e.g. 61"')}${num('age', 'Age')}
         <label class="field"><span>Sex</span>${seg('sex', [['m', 'Male'], ['f', 'Female']])}</label>
       </div>`,
-    () => gym ? `<h2>Your training</h2><p class="muted">This shapes your plan, rep ranges and how fast Ledger adds weight.</p>
+    () => gym ? `<h2>Your training</h2><p class="muted">This shapes your plan, rep ranges and how fast Zelum adds weight.</p>
       <div class="form-grid mt">
         <label class="field span2"><span>Experience</span>${seg('experience', [['beginner', 'Beginner'], ['intermediate', 'Intermediate'], ['advanced', 'Advanced']])}</label>
         <label class="field span2"><span>Goal</span>${seg('focus', [['hypertrophy', 'Muscle'], ['strength', 'Strength'], ['endurance', 'Endurance'], ['general', 'Fitness']])}</label>
@@ -548,21 +564,21 @@ function viewOnboarding() {
       <div class="form-grid mt">${num('pullups', 'Pull-ups')}${num('pushups', 'Push-ups')}${num('dips', 'Dips')}
         <label class="field"><span>Pistol squat?</span>${seg('pistol', [['no', 'No'], ['assisted', 'Assisted'], ['yes', 'Yes']])}</label>
         <label class="field span2"><span>Training days per week</span>${seg('trainDays', [[3, '3'], [4, '4'], [5, '5'], [6, '6']])}</label></div>
-      <p class="tiny muted mt">Farm work already makes you active — 4 days is a great default.</p>`,
+      <p class="tiny muted mt">Not sure? 4 days is a great default.</p>`,
     () => `<h2>Body goal</h2><p class="muted">Sets your calories. At your height, a lean gain usually makes skills easier to learn over time — strength first, then size.</p>
       <div class="choice-list mt">${[['gain', 'Lean muscle gain', 'Small surplus (+300 kcal), high protein. Aim +0.25 kg/week.'], ['maintain', 'Maintain & recomp', 'Eat at maintenance, get stronger at the same weight.'], ['cut', 'Lose fat', 'Moderate deficit (−400 kcal). Easier skills, slower strength.']].map(([v, l, x]) =>
         `<button class="choice glass-btn ${d.bodyGoal === v ? 'on' : ''}" data-act="onbSet" data-k="bodyGoal" data-v="${v}"><b>${l}</b><span class="small muted">${x}</span></button>`).join('')}</div>`,
     () => goalPicker(d, true),
     () => `<div class="onb-hero"><div class="onb-check">${icon('check')}</div><h2>Your quest begins</h2>
-      <p class="muted">Every workout, meal, glass of water, prayer and habit earns XP. Missions refresh daily. Your coach, Caleb, is one tap away.</p>
-      <p class="verse-text mt">“I can do all things through Christ which strengtheneth me.”</p><p class="verse-ref">Philippians 4:13</p></div>`,
+      <p class="muted">Every workout, meal, glass of water and habit earns XP. Missions refresh daily. Your coach, Caleb, is one tap away.</p>
+      <p class="quote mt">The rep you don't want to do is the one that changes you.</p></div>`,
   ];
   return `<div class="onb glass">
     <div class="onb-progress">${Array.from({ length: total + 1 }, (_, i) => `<i class="${i <= s ? 'on' : ''}"></i>`).join('')}</div>
     <div class="onb-body">${steps[s]()}</div>
     <div class="row gap mt">${s > 0 ? `<button class="btn ghost" data-act="onbBack">Back</button>` : ''}
       <button class="btn primary grow" data-act="onbNext">${s === 0 ? 'Begin' : s === total ? 'Begin my journey' : 'Continue'}</button></div>
-    ${s === 0 && Cloud.enabled() ? `<button class="btn google wide mt-s" data-act="cloudSignIn">${GOOGLE_G} I already use Ledger — restore with Google</button>` : ''}
+    ${s === 0 && Cloud.enabled() ? `<button class="btn google wide mt-s" data-act="cloudSignIn">${GOOGLE_G} I already use Zelum — restore with Google</button>` : ''}
   </div>`;
 }
 
@@ -580,7 +596,8 @@ function accountCard() {
       <div class="grow"><b>${esc(u.displayName || 'Google account')}</b><p class="tiny muted">${esc(u.email || '')}</p>
         <p class="tiny sync-line" data-cloud-status data-state="${Cloud.status}">${cloudStatusText()}</p></div>
     </div>
-    <div class="row gap mt"><button class="btn soft grow" data-act="cloudSync">${icon('refresh', 'sm')} Sync now</button><button class="btn ghost" data-act="cloudSignOut">Sign out</button></div>`, 'account-card');
+    <div class="row gap mt"><button class="btn soft grow" data-act="cloudSync">${icon('refresh', 'sm')} Sync now</button><button class="btn ghost" data-act="cloudSignOut">Sign out</button></div>
+    <button class="btn ghost wide mt-s tiny muted" data-act="cloudDelete">Delete account &amp; cloud backup</button>`, 'account-card');
 }
 function goalPicker(d, inOnb) {
   const disc = inOnb ? d.discipline : S.profile.discipline, presets = GOAL_PRESETS.filter(g => !g.disc || g.disc === disc);
@@ -720,6 +737,15 @@ const ACT = {
   coach: () => openCoach(),
   missionTab: d => { missionTab = d.v; render(); },
   trainTab: d => { trainTab = d.v; render(); },
+  faithToggle: () => {
+    S.settings.faith = !faithOn();
+    if (S.settings.faith) {   // bring back prayer and Scripture habits for people who never had them
+      const added = DEFAULT_HABITS.filter(h => h.faith && !S.habits.some(x => x.id === h.id)).map(h => normHabit({ ...h, created: today() }));
+      S.habits.push(...added);
+    }
+    save(); SFX.play(S.settings.faith ? 'toggleOn' : 'toggleOff'); haptic(); render(); Native.sync();
+    toast(S.settings.faith ? `${icon('check', 'xs')} Faith mode on: verse of the day, Scripture and prayer habits` : 'Faith mode off. Your prayer and Scripture habits stay until you remove them.');
+  },
   amen: () => { S.claimed[`done:m:${today()}:faith`] = true; toggleHabit('pray', true); toggleHabit('word', true); SFX.play('check'); fx('[data-hid=pray],[data-hid=word]', 'pop'); haptic(); refresh(); },
   claim: (d, el) => {
     const r = el.getBoundingClientRect();
@@ -733,7 +759,7 @@ const ACT = {
   /* Appearance */
   appearance: () => openSheet(`<div class="row between center"><h3 class="sheet-title">Appearance</h3><button class="round-btn glass" data-act="closeSheet" aria-label="Close">${icon('x')}</button></div>
     <p class="small muted">Pick a palette, then fine-tune any color. Changes apply instantly.</p><div class="mt" id="appearanceBody">${appearanceHTML()}</div>`, { cls: 'tall' }),
-  themePreset: d => { S.settings.theme.preset = d.v; S.settings.theme.colors = {}; applyTheme(); save(); render(); rerenderAppearance(); haptic(); },
+  themePreset: d => { if (!FREE_THEMES.includes(d.v) && !requirePlan('themes')) return; S.settings.theme.preset = d.v; S.settings.theme.colors = {}; applyTheme(); save(); render(); rerenderAppearance(); haptic(); },
   themeReset: () => { S.settings.theme.colors = {}; applyTheme(); save(); render(); rerenderAppearance(); },
   start: d => startWorkout(d.tpl),
   startSkill: d => startWorkout('skill', d.skill),
@@ -751,7 +777,7 @@ const ACT = {
     S.goal = null; burst(innerWidth / 2, innerHeight / 3, 50); SFX.play('levelUp');
     refresh(false);
     openSheet(`<div class="levelup"><div class="lu-glow"></div><p class="eyebrow gold">Quest complete</p><div class="lu-num">${icon('trophy')}</div><h2>${esc(g.title)}</h2>
-      <p class="verse-text">“I have fought a good fight, I have finished my course, I have kept the faith.”</p><p class="muted small">2 Timothy 4:7</p>
+      ${faithOn() ? '<p class="verse-text">“I have fought a good fight, I have finished my course, I have kept the faith.”</p><p class="verse-ref">2 Timothy 4:7</p>' : '<p class="quote">Every master was once a beginner who refused to stop.</p>'}
       <button class="btn primary wide mt" data-act="pickGoal">Choose the next quest</button></div>`, { cls: 'center', onClose: flushLevelUp });
   },
   maxTest: () => {
@@ -769,7 +795,7 @@ const ACT = {
   saveWeight: () => { const v = parseFloat(String(document.getElementById('wVal').value).replace(',', '.')); if (!(v >= 30 && v <= 200)) return toast('Enter a weight in kg'); logWeight(v); closeSheet(); refresh(); },
 
   /* Skills */
-  openSkill: d => openSheet(skillSheet(d.skill), { cls: 'tall' }),
+  openSkill: d => { if (!FREE_SKILLS.includes(d.skill) && d.skill !== goalSkill() && !requirePlan('skills')) return; openSheet(skillSheet(d.skill), { cls: 'tall' }); },
   logSkill: d => {
     const inp = document.getElementById('skillVal'), v = +inp.value; if (!v) return;
     const st = S.skills[d.skill] || 0;
@@ -825,7 +851,7 @@ const ACT = {
     S.workouts.push(w);
     addXP(`workout:${w.id}`, w.xp, `${w.name} complete`);
     refresh(false);
-    const vol = workoutVolume(w), v = VERSES[hashStr(w.id) % VERSES.length];
+    const vol = workoutVolume(w), v = dailyLine(w.id);
     const ups = w.entries.filter(e => getEx(e.ex)?.fam).map(e => ({ e, r: recommend(entryKey(e)) })).filter(x => x.r.next && (x.r.status === 'levelup' || x.r.status === 'load'));
     const loads = w.entries.filter(e => isGym(getEx(e.ex))).map(e => ({ e, r: recommendGym(entryKey(e), { lo: e.lo, hi: e.hi, sets: e.sets.length }) })).filter(x => x.r.status === 'load');
     openSheet(`<div class="summary"><div class="onb-check">${icon('check')}</div><h2>${esc(w.name)} complete</h2>
@@ -834,8 +860,8 @@ const ACT = {
       ${loads.length ? `<h4 class="mt">${icon('plus', 'sm gold')} Weight goes up next time</h4><ul class="pr-list">${loads.map(x => `<li>${esc(entryName(x.e))} <b>${x.r.kg} kg</b></li>`).join('')}</ul>` : ''}
       ${ups.length ? `<h4 class="mt">${icon('up', 'sm gold')} Ready to level up</h4>${ups.map(x => `<div class="row center between up-row"><span class="small">${esc(entryName(x.e))} → <b>${esc(EX[x.r.next].name)}</b></span><button class="btn claim sm" data-act="famLevel" data-fam="${getEx(x.e.ex).fam}" data-d="1" data-close="1">Level up</button></div>`).join('')}` : ''}
       ${skillHits.length ? `<h4 class="mt">${icon('star', 'sm gold')} Skill target hit</h4>${skillHits.map(h => `<div class="row center between up-row"><span class="small">${esc(SKILLS[h.skill].steps[h.step].name)}</span><button class="btn claim sm" data-act="openSkill" data-skill="${h.skill}">Unlock</button></div>`).join('')}` : ''}
-      <p class="verse-text mt">“${esc(v.text)}”</p><p class="verse-ref">${esc(v.ref)}</p>
-      <button class="btn primary wide mt" data-act="closeSheet">Amen</button></div>`, { cls: 'center', onClose: flushLevelUp });
+      ${lineHTML(v, 'mt')}
+      <button class="btn primary wide mt" data-act="closeSheet">${faithOn() ? 'Amen' : 'Done'}</button></div>`, { cls: 'center', onClose: flushLevelUp });
     burst(innerWidth / 2, innerHeight / 3, 30); SFX.play('complete'); if (w.prs.length) setTimeout(() => SFX.play('pr'), 700); haptic([30, 50, 30]);
   },
   famLevel: (d, el) => {
@@ -866,6 +892,7 @@ const ACT = {
     toast(`${icon('check', 'xs')} ${foodServings} × ${esc(f.name)} added`); SFX.play('toggleOn'); haptic();
   },
   customFood: () => {
+    if (!requirePlan('foods')) return;
     const name = document.getElementById('cfName').value.trim(), kcal = +document.getElementById('cfKcal').value, p = +document.getElementById('cfP').value || 0;
     if (!name || !kcal) return toast('Add a name and calories');
     const f = { id: 'c_' + uid(), name, unit: document.getElementById('cfUnit').value.trim() || '1 serving', kcal, p };
@@ -902,6 +929,7 @@ const ACT = {
 
   /* Cloud */
   cloudSignIn: () => Cloud.signIn(),
+  cloudDelete: () => askConfirm('Delete your account?', 'This permanently deletes your Zelum cloud backup and your sign-in from Zelum\'s servers. It can\'t be undone. Your progress stays on this device, and you can export a backup from Me first.', 'Delete forever', () => Cloud.deleteAccount()),
   cloudSignOut: () => askConfirm('Sign out?', 'Your progress stays on this device. Sign in again any time to sync.', 'Sign out', () => Cloud.signOut().then(() => render()), false),
   cloudSync: async () => { if (!Cloud.user) return; SFX.play('swoosh'); if (Cloud.unsynced()) await Cloud.push(); else await Cloud.reconcile(await Cloud.ref().get(), true); if (Cloud.status === 'synced') toast(`${icon('check', 'xs')} Up to date`); },
   cloudKeep: async d => {
@@ -932,6 +960,7 @@ const ACT = {
     if (onb.step === 1 && !GOAL_PRESETS.some(g => g.id === d.goal && (!g.disc || g.disc === d.discipline))) d.goal = d.discipline === 'gym' ? 'g_bench' : 'g_muscleup';
     if (onb.step < 6) { onb.step++; render(); window.scrollTo({ top: 0 }); return; }
     // Finish onboarding
+    S.seenVersion = VERSION;   // new people start on this version: no What's new for them
     const gym = d.discipline === 'gym', days = +d.trainDays || 4, pu = +d.pullups || 0;
     Object.assign(S.profile, { name: d.name.trim(), heightCm: +d.height || 171, age: +d.age || 22, sex: d.sex, trainDays: days, bodyGoal: d.bodyGoal,
       discipline: d.discipline, schedule: [...(TRAIN_PATTERNS[days] || TRAIN_PATTERNS[4])],
@@ -949,7 +978,7 @@ const ACT = {
   },
 };
 
-Object.assign(ACT, HABIT_ACT, RANK_ACT, MUSIC_ACT, NOTIF_ACT, TRAIN_ACT, { manageHabits: () => go('habits') });
+Object.assign(ACT, HABIT_ACT, RANK_ACT, MUSIC_ACT, NOTIF_ACT, TRAIN_ACT, PLAN_ACT, WHATSNEW_ACT, { manageHabits: () => go('habits') });
 
 function addFoodItem(f, qty) {
   const fd = foodDay(fuelDay);
@@ -962,7 +991,8 @@ function rerenderAppearance() { document.querySelectorAll('#appearanceBody').for
 /* How Android draws the app's WebView (native side: MainActivity.applyRendering) */
 const RENDER_MODES = [['standard', 'Standard (default)'], ['layer', 'Layered'], ['software', 'Software (slowest, safest)']];
 const CHG = {
-  rendering: el => Native.p.ledger.rendering({ mode: el.value }).then(r => { Native.renderMode = r.mode; toast(`Drawing mode: ${RENDER_MODES.find(m => m[0] === r.mode)?.[1] || r.mode}`); }).catch(() => toast('Update the Ledger app to change this')),
+  gfx: el => { Gfx.set(el.value); render(); toast(`Graphics: ${el.value === 'auto' ? 'Auto' : el.value === 'smooth' ? 'Smooth' : 'Full glass'}`); },
+  rendering: el => Native.p.ledger.rendering({ mode: el.value }).then(r => { Native.renderMode = r.mode; toast(`Drawing mode: ${RENDER_MODES.find(m => m[0] === r.mode)?.[1] || r.mode}`); }).catch(() => toast('Update the Zelum app to change this')),
   setVal: el => { const s = S.active.entries[el.dataset.e].sets[el.dataset.s]; s[el.dataset.f] = Math.max(0, parseFloat(el.value) || 0); save(); },
   swapEx: el => { const old = S.active.entries[el.dataset.e], n = makeEntry(el.value, null, null, old && old.lo && getEx(el.value)?.gym ? { sets: old.sets.length, rest: old.rest } : null); S.active.entries[el.dataset.e] = n; save(); render(); },
   addEx: el => { if (!el.value) return; S.active.entries.push(makeEntry(el.value)); save(); render(); setTimeout(() => document.getElementById(`ex-${S.active.entries.length - 1}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' }), 50); },
@@ -984,7 +1014,7 @@ const CHG = {
         askConfirm('Import backup?', `This replaces the data on this device with the backup (${data.workouts.length} workouts).`, 'Import', () => {
           S = migrate(data); applyTheme(); saveNow(); render(true); toast('Backup imported');
         }, false);
-      } catch (e) { toast('That file is not a Ledger backup'); }
+      } catch (e) { toast('That file is not a Zelum backup'); }
     };
     r.readAsText(f);
   },
@@ -1005,6 +1035,7 @@ const INP = {
   },
   /* Live theme editing: update CSS variables instantly, save on release */
   themeColor: el => {
+    if (!can('themes')) { rerenderAppearance(); return requirePlan('themes'); }
     S.settings.theme.colors = { ...(S.settings.theme.colors || {}), [el.dataset.k]: el.value };
     applyTheme(); const hx = document.getElementById(`hex-${el.dataset.k}`); if (hx) hx.textContent = el.value.toUpperCase(); save();
   },
@@ -1035,19 +1066,29 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden && S.
 load();
 applyTheme();
 try { Native.init(); } catch (e) { console.error("Native bridge failed — the app keeps working without it", e); }
+Billing.init();   // Google Play subscriptions (Android app with a RevenueCat key only)
 /* Safety net: never leave a blank screen — if nothing rendered, offer a reload */
 window.addEventListener('error', e => { window.__ledgerErr = String(e.message || e.error || 'error'); });
 setTimeout(() => {
   const v = document.getElementById('view');
-  if (v && !v.innerHTML.trim()) v.innerHTML = `<div class="handback-card glass" style="margin:30vh auto 0"><h2>Ledger couldn't start</h2><p class="muted small">${esc(window.__ledgerErr || 'Unknown error')}</p><button class="btn primary wide mt" onclick="location.reload()">Reload</button></div>`;
+  if (v && !v.innerHTML.trim()) v.innerHTML = `<div class="handback-card glass" style="margin:30vh auto 0"><h2>Zelum couldn't start</h2><p class="muted small">${esc(window.__ledgerErr || 'Unknown error')}</p><button class="btn primary wide mt" onclick="location.reload()">Reload</button></div>`;
 }, 4000);
+// Pieces that only depend on the saved state are remembered between renders (memoState in ui.js)
+Gfx.init();
+dayCompletion = memoState(dayCompletion);
+weeklyReview = memoState(weeklyReview);
 route = (location.hash || '#today').slice(1);
 render(true);
 setInterval(tick, 250);
+WhatsNew.maybeShow();   // once per update
 if (Cloud.enabled() && Cloud.meta().uid) Cloud.load();
 Music.handleRedirect().finally(() => Music.start());   // restore the signed-in session quietly
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
-  // The worker serves the app from the device cache; on a local preview that would hide fresh edits until a second reload
-  if (/^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) navigator.serviceWorker.getRegistrations().then(rs => rs.forEach(r => r.unregister())).catch(() => { });
+  // The worker serves the app from the device cache; on a local preview that would hide fresh edits until a second reload.
+  // The Google Play build has its files inside the app, so it needs no worker (and must drop the live site's old cache).
+  if (Native.store || /^(localhost|127\.0\.0\.1|\[::1\])$/.test(location.hostname)) {
+    navigator.serviceWorker.getRegistrations().then(rs => rs.forEach(r => r.unregister())).catch(() => { });
+    if (Native.store && window.caches) caches.keys().then(ks => ks.forEach(k => caches.delete(k))).catch(() => { });
+  }
   else navigator.serviceWorker.register('sw.js').catch(() => { });
 }

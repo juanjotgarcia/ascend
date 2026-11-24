@@ -1,4 +1,4 @@
-/* LEDGER — exercise illustrations, drawn as SVG.
+/* ZELUM — exercise illustrations, drawn as SVG.
    A capsule mannequin (shaded limbs, glossy head) posed by joint angles, with glass equipment:
    bars, benches, barbells, dumbbells, kettlebells, cable towers, machines.
    Small tiles show the start position as a faint ghost and the finish solid; the big guide view
@@ -614,7 +614,19 @@ function figureModel(exId, opts) {
 
 let figSeq = 0;
 const reducedMotion = () => { try { return matchMedia('(prefers-reduced-motion: reduce)').matches; } catch (e) { return false; } };
+/* Illustrations are pure (same exercise, size, options and id give the same SVG), and building one costs ~1 ms,
+   so each is built once and reused on later renders. stableIds() makes the ids repeat between renders. */
+const figMemo = new Map();
 function figureSVG(exId, size = 96, opts = {}) {
+  const key = `${svgIdPrefix}fg${figSeq + 1}|${exId}|${size}|${JSON.stringify(opts)}|${reducedMotion()}`;
+  const hit = figMemo.get(key);
+  if (hit !== undefined) { figSeq++; return hit; }
+  const svg = figureSVGBuild(exId, size, opts);
+  if (figMemo.size > 300) figMemo.clear();
+  figMemo.set(key, svg);
+  return svg;
+}
+function figureSVGBuild(exId, size = 96, opts = {}) {
   const M = figureModel(exId, opts), id = svgIdPrefix + 'fg' + (++figSeq);
   const anim = opts.anim && M.two && !reducedMotion();
   const layers = J => {   // ordered layers for one pose

@@ -1,4 +1,4 @@
-/* LEDGER — game & training logic: progressive overload, PRs, nutrition targets,
+/* ZELUM — game & training logic: progressive overload, PRs, nutrition targets,
    habits, streaks, missions, achievements, goal progress and the Coach. */
 
 const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
@@ -311,7 +311,7 @@ function dailyMissions(k = today()) {
   list.push(isTrainingDay(k)
     ? { id: 'workout', title: 'Complete a workout', icon: 'bolt', xp: 60, eval: d => ({ cur: workoutsOn(d).length, max: 1 }) }
     : { id: 'mobility', title: 'Rest day: 10 min of stretching', icon: 'leaf', xp: 25, manual: true });
-  list.push({ id: 'faith', title: 'Read today\'s verse & pray', icon: 'cross', xp: 25, manual: true });
+  if (faithOn()) list.push({ id: 'faith', title: 'Read today\'s verse & pray', icon: 'cross', xp: 25, manual: true });
   const pool = [
     { id: 'water',   title: `Drink ${fmtL(t.water)} of water`, icon: 'drop', xp: 30, eval: d => ({ cur: dayTotals(d).water, max: t.water }) },
     { id: 'protein', title: `Eat ${t.protein} g of protein`, icon: 'flame', xp: 40, eval: d => ({ cur: dayTotals(d).p, max: t.protein }) },
@@ -329,13 +329,13 @@ function weeklyMissions(k = today()) {
   const list = [
     { id: 'wtrain', title: `Train ${S.profile.trainDays} days this week`, icon: 'bolt', xp: 200, eval: () => ({ cur: days.filter(d => workoutsOn(d).length).length, max: S.profile.trainDays }) },
     { id: 'wwater', title: 'Hit your water goal 5 days', icon: 'drop', xp: 150, eval: () => ({ cur: days.filter(d => dayTotals(d).water >= targets(d).water).length, max: 5 }) },
-    { id: 'wfaith', title: 'Prayer & Scripture 5 days', icon: 'book', xp: 150, eval: () => ({ cur: days.filter(d => ['pray', 'word'].every(id => (S.habitLog[d] || []).includes(id))).length, max: 5 }) },
+    faithOn() && { id: 'wfaith', title: 'Prayer & Scripture 5 days', icon: 'book', xp: 150, eval: () => ({ cur: days.filter(d => ['pray', 'word'].every(id => (S.habitLog[d] || []).includes(id))).length, max: 5 }) },
     { id: 'wweigh', title: 'Weigh in once', icon: 'scale', xp: 50, eval: () => ({ cur: S.bodyweight.some(b => b.date >= wk) ? 1 : 0, max: 1 }) },
   ];
   list.push(goalSkill()
     ? { id: 'wskill', title: 'Practice skills on 3 days', icon: 'star', xp: 120, eval: () => ({ cur: new Set(S.skillLog.filter(l => l.date >= wk).map(l => l.date)).size, max: 3 }) }
     : { id: 'wpr', title: 'Set 2 personal records', icon: 'trophy', xp: 120, eval: () => ({ cur: sum(S.workouts.filter(w => w.date >= wk).map(w => (w.prs || []).length)), max: 2 }) });
-  return list.map(m => missionState(m, `wm:${wk}:${m.id}`, k));
+  return list.filter(Boolean).map(m => missionState(m, `wm:${wk}:${m.id}`, k));
 }
 function missionState(m, key, k) {
   let cur, max;
@@ -392,6 +392,21 @@ function checkAchievements() {
 function verseOfDay(k = today()) { return VERSES[hashStr('v' + k) % VERSES.length]; }
 function quoteOfDay(k = today()) { return QUOTES[hashStr('q' + k) % QUOTES.length]; }
 
+/* ---------- Faith mode ----------
+   Off by default (a standard training app). Me → Settings → Faith mode adds the verse of the day, Scripture in
+   workouts and level-ups, prayer and Bible habits and the faith missions. People who used the app before Faith
+   mode existed keep it on (store.js migrate). */
+const faithOn = () => !!(S && S.settings && S.settings.faith);
+/* An encouraging line for a moment (level-up, finished workout): a verse in Faith mode, a training quote otherwise */
+function dailyLine(seed) {
+  const h = hashStr(String(seed));
+  if (faithOn()) { const v = VERSES[h % VERSES.length]; return { text: v.text, ref: v.ref }; }
+  return { text: QUOTES[h % QUOTES.length], ref: '' };
+}
+function lineHTML(l, cls = '') {
+  return l.ref ? `<p class="verse-text ${cls}">“${esc(l.text)}”</p><p class="verse-ref">${esc(l.ref)}</p>` : `<p class="quote ${cls}">${esc(l.text)}</p>`;
+}
+
 /* ---------- Coach Caleb (offline assistant) ----------
    Named after Caleb, still strong at 85 (Joshua 14:11). Reads your data and answers. */
 function coachReply(input) {
@@ -400,6 +415,7 @@ function coachReply(input) {
   const name = S.profile.name || 'friend';
   const tg = targets(), tot = dayTotals(), li = levelInfo(), gp = goalProgress();
   const v = VERSES[Math.floor(Math.random() * VERSES.length)];
+  const faith = faithOn(), vtag = x => faith ? `\n\n_“${x.text}” — ${x.ref}_` : '', vchip = faith ? 'Give me a verse' : 'Motivate me';
 
   // --- Actions: log weight / water from natural language
   const wm = t.match(/(?:weigh|weight|i'?m|i am|am)\D{0,12}(\d{2,3}(?:[.,]\d{1,2})?)\s*(?:kg|kilo|kilos)?\b/);
@@ -420,21 +436,21 @@ function coachReply(input) {
     if (ml > 0 && ml <= 5000) {
       addWater(ml);
       const left = Math.max(0, tg.water - dayTotals().water);
-      return { text: `Added **${ml} ml** of water. ${left ? `${fmtL(left)} to go today.` : 'Water goal done for today! 💧'}\n\n_“${VERSE_WATER.text}” — ${VERSE_WATER.ref}_`, chips: ['What should I eat?', 'Today\'s workout'] };
+      return { text: `Added **${ml} ml** of water. ${left ? `${fmtL(left)} to go today.` : 'Water goal done for today! 💧'}${vtag(VERSE_WATER)}`, chips: ['What should I eat?', 'Today\'s workout'] };
     }
   }
 
-  if (has('help', 'what can you', 'commands')) return { text: `I'm **Caleb**, your coach. I read your logs and help you climb. Try:\n• “What should I train today?”\n• “What should I focus on?” — weak spots & stalls\n• “Am I recovered?”\n• “How's my progress?”\n• “I weigh 61.5 kg” — I'll log it\n• “I drank 2 glasses” — I'll log it\n• “How much protein do I need?”\n• “I'm stuck on pull-ups”\n• “I'm sore / tired”\n• “Give me a verse”`, chips: ['Today\'s workout', 'My progress', 'Give me a verse'] };
+  if (has('help', 'what can you', 'commands')) return { text: `I'm **Caleb**, your coach. I read your logs and help you climb. Try:\n• “What should I train today?”\n• “What should I focus on?” — weak spots & stalls\n• “Am I recovered?”\n• “How's my progress?”\n• “I weigh 61.5 kg” — I'll log it\n• “I drank 2 glasses” — I'll log it\n• “How much protein do I need?”\n• “I'm stuck on pull-ups”\n• “I'm sore / tired”\n• ${faith ? '“Give me a verse”' : '“Motivate me”'}`, chips: ['Today\'s workout', 'My progress', vchip] };
 
   if (has('pain', 'injur', 'hurt', 'sharp', 'tendon', 'elbow', 'wrist', 'shoulder pain'))
-    return { text: `Listen to your body, ${name}. **Sharp or joint pain is a stop sign** — muscle burn is fine, joint pain is not.\n• Skip the movement that hurts; train what doesn't.\n• Elbows/wrists: warm up longer, reduce volume for 1–2 weeks, avoid the end range that hurts.\n• If pain is sharp, swelling, or lasts more than a week, please see a doctor or physiotherapist.\n\n_“${VERSES[18].text}” — ${VERSES[18].ref}_`, chips: ['Plan a light day', 'Motivate me'] };
+    return { text: `Listen to your body, ${name}. **Sharp or joint pain is a stop sign** — muscle burn is fine, joint pain is not.\n• Skip the movement that hurts; train what doesn't.\n• Elbows/wrists: warm up longer, reduce volume for 1–2 weeks, avoid the end range that hurts.\n• If pain is sharp, swelling, or lasts more than a week, please see a doctor or physiotherapist.${vtag(VERSES[18])}`, chips: ['Plan a light day', 'Motivate me'] };
 
   if (has('sore', 'tired', 'exhausted', 'fatigue', 'no energy', 'light day', /\brest\b/))
-    return { text: `Soreness means you challenged the muscle; it's not required for growth. Options:\n• **Light day:** mobility + skill practice (handstand / L-sit holds) at easy effort.\n• **Rest day:** walk, stretch, sleep 8 h, eat your protein (${tg.protein} g).\n• Farm work counts as activity. If you worked hard today, a short session is enough.\n\n_“${VERSE_REST.text}” — ${VERSE_REST.ref}_`, chips: ['How much protein?', 'Give me a verse'] };
+    return { text: `Soreness means you challenged the muscle; it's not required for growth. Options:\n• **Light day:** mobility + skill practice (handstand / L-sit holds) at easy effort.\n• **Rest day:** walk, stretch, sleep 8 h, eat your protein (${tg.protein} g).\n• A physical job counts as activity. If you worked hard today, a short session is enough.${vtag(VERSE_REST)}`, chips: ['How much protein?', vchip] };
 
   if (has('stuck', 'plateau', 'not improving', 'deload', 'no progress', 'stall')) {
     const st = [...new Set([...stalled().map(e => e.name), ...coachReport().stall.filter(x => x.hard).map(x => keyName(x.key))])].slice(0, 4);
-    return { text: `${st.length ? `I see a stall in **${st.join(', ')}** (no improvement over 3 sessions). ` : 'Your numbers are still moving, but here\'s the plateau playbook: '}\n• **Deload** one week: same exercises, half the sets.\n• **Eat & sleep:** at ~${latestWeight() || '60'} kg, eat ~${tg.kcal} kcal and ${tg.protein} g protein. Under-eating is the #1 plateau cause.\n• **Change the stimulus:** slow negatives (5 s), pauses at the hardest point, or add a backpack load.\n• **Grease the groove:** a few easy sets of the stuck move through the day on the farm.\n\n_“${VERSES[6].text}” — ${VERSES[6].ref}_`, chips: ['Today\'s workout', 'How much should I eat?'] };
+    return { text: `${st.length ? `I see a stall in **${st.join(', ')}** (no improvement over 3 sessions). ` : 'Your numbers are still moving, but here\'s the plateau playbook: '}\n• **Deload** one week: same exercises, half the sets.\n• **Eat & sleep:** at ~${latestWeight() || '60'} kg, eat ~${tg.kcal} kcal and ${tg.protein} g protein. Under-eating is the #1 plateau cause.\n• **Change the stimulus:** slow negatives (5 s), pauses at the hardest point, or add a backpack load.\n• **Grease the groove:** a few easy sets of the stuck move through the day.${vtag(VERSES[6])}`, chips: ['Today\'s workout', 'How much should I eat?'] };
   }
 
   if (has('deload', 'fatigue', 'overtrain', 'recover', 'readiness')) {
@@ -459,10 +475,10 @@ function coachReply(input) {
   }
 
   if (has('water', 'hydrat', 'thirst', 'drink'))
-    return { text: `Today: **${fmtL(tot.water)} / ${fmtL(tg.water)}**. ${tot.water >= tg.water ? 'Goal done! 💧' : `${fmtL(tg.water - tot.water)} left.`}\nWorking outside on the farm in the heat? Add 500 ml–1 L, and a pinch of salt + lemon or panela helps replace sweat.\n\nTell me “I drank 2 glasses” and I'll log it.`, chips: ['I drank 1 glass', 'How much protein?'] };
+    return { text: `Today: **${fmtL(tot.water)} / ${fmtL(tg.water)}**. ${tot.water >= tg.water ? 'Goal done! 💧' : `${fmtL(tg.water - tot.water)} left.`}\nWorking or training in the heat? Add 500 ml–1 L, and a pinch of salt + lemon or panela helps replace sweat.\n\nTell me “I drank 2 glasses” and I'll log it.`, chips: ['I drank 1 glass', 'How much protein?'] };
 
   if (has('protein', /\beat\b/, 'food', 'calor', 'diet', 'nutrition', 'meal', 'bulk', /\bgain\b/, 'mass', 'hungry'))
-    return { text: `Your targets: **${tg.kcal} kcal** and **${tg.protein} g protein** (1.8 g/kg).\nToday so far: ${tot.kcal} kcal · ${tot.p} g protein.\n\nCheap, high-protein farm foods:\n• **Eggs** — 6 g each. 4 eggs = 25 g\n• **Beans/lentils + rice** — complete protein, ~20 g per plate\n• **Milk** — 8 g per glass; 2–3 glasses a day is easy protein & calories\n• **Canned tuna/sardines** — 22–28 g per can\n• **Fresh cheese, peanut butter, oats, plantain, potatoes** for calories\n\n${S.profile.bodyGoal === 'gain' ? 'To gain lean muscle: aim for +0.25 kg per week. Not gaining after 2 weeks? Add a glass of milk + a banana + 2 tbsp peanut butter (~450 kcal).' : ''}\n\n_“${VERSE_FOOD.text}” — ${VERSE_FOOD.ref}_`, chips: ['I weigh 61 kg', 'Today\'s workout'] };
+    return { text: `Your targets: **${tg.kcal} kcal** and **${tg.protein} g protein** (1.8 g/kg).\nToday so far: ${tot.kcal} kcal · ${tot.p} g protein.\n\nCheap, high-protein foods:\n• **Eggs** — 6 g each. 4 eggs = 25 g\n• **Beans/lentils + rice** — complete protein, ~20 g per plate\n• **Milk** — 8 g per glass; 2–3 glasses a day is easy protein & calories\n• **Canned tuna/sardines** — 22–28 g per can\n• **Fresh cheese, peanut butter, oats, plantain, potatoes** for calories\n\n${S.profile.bodyGoal === 'gain' ? 'To gain lean muscle: aim for +0.25 kg per week. Not gaining after 2 weeks? Add a glass of milk + a banana + 2 tbsp peanut butter (~450 kcal).' : ''}${vtag(VERSE_FOOD)}`, chips: ['I weigh 61 kg', 'Today\'s workout'] };
 
   if (has('what should', 'today', 'train', 'workout', /\bplan\b/, 'routine', 'session')) {
     if (S.active) return { text: `You've got **${S.active.name}** in progress. Finish strong — head to Train.`, chips: ['Motivate me'] };
@@ -479,19 +495,19 @@ function coachReply(input) {
   }
 
   if (has('sleep', 'insomnia'))
-    return { text: `Sleep is where the muscle is built. Aim for **7–9 h**. On the farm you probably wake early — so protect the bedtime: screens off 30 min before, a short prayer, same time every night.`, chips: ['Give me a verse'] };
+    return { text: `Sleep is where the muscle is built. Aim for **7–9 h**. Early mornings? Then protect the bedtime: screens off 30 min before, ${faith ? 'a short prayer, ' : 'a calm wind-down, '}same time every night.`, chips: [vchip] };
 
-  if (has('verse', 'pray', 'god', 'jesus', 'faith', 'bible', 'scripture', 'lord', 'christ'))
+  if (faith && has('verse', 'pray', 'god', 'jesus', 'faith', 'bible', 'scripture', 'lord', 'christ'))
     return { text: `_“${v.text}”_\n— **${v.ref}**\n\n${v.note}\n\n🙏 *Lord Jesus, thank You for this body and this day. Give me strength to train with discipline, humility in my progress, and a heart that gives You the glory. Amen.*`, chips: ['Motivate me', 'Today\'s workout'] };
 
   if (has('motivat', 'lazy', 'give up', 'quit', 'don\'t feel', 'dont feel', 'unmotivated', 'sad', 'discourag', 'hard'))
-    return { text: `${name}, a year ago you started with nothing but a bar and a decision. You're still here. That's not luck — that's character.\n\n**“${quoteOfDay()}”**\n\nDo just the warm-up. If you still want to stop after 10 minutes, stop. You almost never will.\n\n_“${v.text}” — ${v.ref}_`, chips: ['Today\'s workout', 'Give me a verse'] };
+    return { text: `${name}, you started with nothing but a decision. You're still here. That's not luck — that's character.\n\n**“${quoteOfDay()}”**\n\nDo just the warm-up. If you still want to stop after 10 minutes, stop. You almost never will.${vtag(v)}`, chips: ['Today\'s workout', faith ? 'Give me a verse' : 'My progress'] };
 
   if (has('thank', 'thanks', 'amen', 'great', 'awesome', 'nice'))
-    return { text: `Glory to God, ${name}. Keep climbing. 🏔️`, chips: ['My progress'] };
+    return { text: `${faith ? 'Glory to God' : 'Anytime'}, ${name}. Keep climbing. 🏔️`, chips: ['My progress'] };
 
   if (has(/\b(hi|hello|hey|hola|yo)\b/, 'good morning', 'good evening'))
-    return { text: `Hey ${name}! Level ${li.lvl} ${li.title}, ${streak()}-day streak. ${isTrainingDay() ? 'Training day today.' : 'Rest day today.'} What do you need?`, chips: ['Today\'s workout', 'My progress', 'Give me a verse'] };
+    return { text: `Hey ${name}! Level ${li.lvl} ${li.title}, ${streak()}-day streak. ${isTrainingDay() ? 'Training day today.' : 'Rest day today.'} What do you need?`, chips: ['Today\'s workout', 'My progress', vchip] };
 
-  return { text: `I'm not sure I got that. I'm an offline coach, so I understand training, food, water, skills, progress and faith questions. Try one of these:`, chips: ['Today\'s workout', 'My progress', 'How much protein?', 'Help'] };
+  return { text: `I'm not sure I got that. I'm an offline coach, so I understand training, food, water, skills and progress${faith ? ' and faith' : ''} questions. Try one of these:`, chips: ['Today\'s workout', 'My progress', 'How much protein?', 'Help'] };
 }

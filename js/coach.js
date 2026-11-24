@@ -1,4 +1,4 @@
-/* LEDGER — Coach Caleb's training analysis.
+/* ZELUM — Coach Caleb's training analysis.
    Reads the workout log only (no guesses, no randomness) and turns it into ranked, explained advice:
    progress and stalls per exercise, weekly sets per muscle group, push/pull balance, training load,
    fatigue and recovery, consistency, and whether the split fits the weeks the athlete really trains.
@@ -177,7 +177,7 @@ function buildReport() {
   }
   if (S.profile.bodyGoal === 'cut' && stall.length && W.length >= 8)
     ins.push({ id: 'bw-cut', kind: 'info', pri: 5, icon: 'scale', title: 'Holding strength while losing fat', body: 'Slower progress is normal in a calorie deficit. Keeping your numbers steady is a win — keep protein high and do not cut volume.', why: ['Body goal: fat loss.', `${stall.length} exercise(s) flat.`] });
-  if (expLv() === 1 && W.length < 12 && W.length) ins.push({ id: 'beginner', kind: 'info', pri: 5, icon: 'star', title: 'Beginner gains are real', body: 'You can add weight or reps almost every session right now. Own the technique first; Ledger raises the targets as soon as you hit the top of the range.', why: ['Experience: beginner.', `${W.length} workouts logged.`] });
+  if (expLv() === 1 && W.length < 12 && W.length) ins.push({ id: 'beginner', kind: 'info', pri: 5, icon: 'star', title: 'Beginner gains are real', body: 'You can add weight or reps almost every session right now. Own the technique first; Zelum raises the targets as soon as you hit the top of the range.', why: ['Experience: beginner.', `${W.length} workouts logged.`] });
 
   if (!ins.length) ins.push({ id: 'collecting', kind: 'info', pri: 9, icon: 'chart', title: 'Building your picture', body: 'Nothing needs changing yet. Log your sets and rate the effort after each exercise — with two sessions in a week I can compare muscles, spot stalls and check recovery.', why: [`${last7.length} session${last7.length === 1 ? '' : 's'} in the last 7 days, ${W.length} in total.`] });
   ins.sort((a, b) => a.pri - b.pri);

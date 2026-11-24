@@ -1,4 +1,4 @@
-/* LEDGER — the path to King: 11 ranks, each with its own shield that evolves
+/* ZELUM — the path to King: 11 ranks, each with its own shield that evolves
    from plain farm wood to a crowned diamond shield. Shields are drawn as SVG. */
 
 const RANKS = [
@@ -136,9 +136,9 @@ function rankSheet(i) {
     <p class="eyebrow ${unlocked ? 'gold' : ''}">${unlocked ? 'Unlocked' : `Unlocks at level ${r.lvl}`}</p>
     <h2>${esc(r.title)}</h2><p class="muted small">${esc(r.shield)}</p>
     <p class="mt">${esc(r.desc)}</p>
-    <p class="verse-text small mt">“${esc(r.verse)}”</p><p class="verse-ref">${esc(r.ref)}</p>
+    ${faithOn() ? `<p class="verse-text small mt">“${esc(r.verse)}”</p><p class="verse-ref">${esc(r.ref)}</p>` : ''}
     ${unlocked ? '' : `<p class="tiny muted mt">${fmtN(xpForLevel(r.lvl) - li.xp)} XP to go</p>`}
-    <button class="btn primary wide mt" data-act="closeSheet">${unlocked ? 'Amen' : 'Keep climbing'}</button></div>`;
+    <button class="btn primary wide mt" data-act="closeSheet">${unlocked && faithOn() ? 'Amen' : 'Keep climbing'}</button></div>`;
 }
 const RANK_ACT = {
   rankInfo: d => { openSheet(rankSheet(+d.i), { cls: 'center' }); SFX.play('open'); },
