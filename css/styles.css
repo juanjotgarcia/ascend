@@ -1067,9 +1067,9 @@ details.whyd ul { margin-top: 6px; padding-left: 14px; display: grid; gap: 3px; 
    which Chrome runs on the GPU in step with the scroll itself (no script per frame). */
 #topbar { position: fixed; z-index: 25; top: 0; left: 0; right: 0; height: calc(var(--safe-t) + 50px); padding: var(--safe-t) 22px 0;
   display: flex; align-items: center; background: rgba(0, 0, 0, .9); border-bottom: 1px solid rgba(255, 255, 255, .08);
-  opacity: 0; pointer-events: none; transition: opacity .22s cubic-bezier(.2, .8, .2, 1); }
+  opacity: 0; pointer-events: none; transition: opacity .16s cubic-bezier(.2, .8, .2, 1); }
 #topbar b { font-size: 18px; font-weight: 750; letter-spacing: -.02em; opacity: 0; transform: translate3d(0, 10px, 0);
-  transition: transform .38s cubic-bezier(.16, 1, .3, 1), opacity .24s ease; }
+  transition: transform .22s cubic-bezier(.16, 1, .3, 1), opacity .16s ease; }
 #topbar.on { opacity: 1; }
 #topbar.on b { opacity: 1; transform: none; }
 .onboarding #topbar { display: none; }
@@ -1081,3 +1081,21 @@ details.whyd ul { margin-top: 6px; padding-left: 14px; display: grid; gap: 3px; 
 }
 
 .glass.pressed::before { background: rgba(255, 255, 255, .065); }
+
+/* Moving layer prepared when a finger lands at a screen edge (js/motion.js) */
+#view.elastic-ready { will-change: transform; }
+
+/* ---------- Settings screen (v1.14.1): grouped rows, like the phone's own settings ---------- */
+.set-head { justify-content: flex-start; gap: 14px; }
+.set-head .round-btn { flex: none; }
+.ic.flip { transform: scaleX(-1); }
+.sgroup { border-radius: 24px; padding: 4px; margin-bottom: 14px; }
+.srow { position: relative; display: flex; align-items: center; gap: 14px; width: 100%; min-height: 62px; padding: 10px 12px; border-radius: 20px; text-align: left; }
+.srow + .srow::before { content: ""; position: absolute; left: 62px; right: 14px; top: 0; height: 1px; background: rgba(255, 255, 255, .06); }
+.srow.pressed { background: rgba(255, 255, 255, .065); }
+.srow .grow { display: flex; flex-direction: column; gap: 2px; }
+.srow b { font-size: 15.5px; font-weight: 650; }
+.srow .grow span { font-size: 12.5px; color: var(--text-3); }
+.s-ic { flex: none; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 12px; color: var(--tc); background: color-mix(in srgb, var(--tc) 16%, transparent); }
+.s-chev { color: var(--text-3); }
+.set-body > .card { margin-bottom: 14px; }

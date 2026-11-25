@@ -1,6 +1,6 @@
 /* ZELUM — views, navigation and actions. */
 
-const VERSION = '1.14.0';
+const VERSION = '1.14.1';
 /* Browser engine version (the Android app's WebView updates separately from Chrome), shown under Me for support */
 const engineTag = () => { const m = navigator.userAgent.match(/Chrome\/(\d+)/); return m ? ` · ${/LedgerAndroid|; wv\)/.test(navigator.userAgent) ? 'WebView' : 'Chrome'} ${m[1]}` : ''; };
 const NAV = [
@@ -46,13 +46,24 @@ function showLevelUp(lvl) {
 }
 
 /* ---------- Navigation ---------- */
-function go(r) {
-  if (r === 'skills') { trainTab = 'skills'; r = 'train'; }
-  if (!NAV.find(n => n.id === r) && r !== 'path') r = 'today';
+/* '#settings/notifications' → ['settings', 'notifications']; anything unknown → Today */
+function parseRoute(r) {
+  r = String(r || '');
+  if (r === 'skills') { trainTab = 'skills'; return ['train', null]; }
+  if (r === 'settings' || r.startsWith('settings/')) { const sec = r.split('/')[1] || null; return ['settings', SETTINGS_SECS.some(x => x.id === sec) ? sec : null]; }
+  return [NAV.find(n => n.id === r) || r === 'path' ? r : 'today', null];
+}
+// History entries pushed for Settings (so Android's back button steps out). Leaving Settings by a tab unwinds them.
+let navDepth = 0, pendingGo = null;
+function go(target, fromHistory = false) {
+  const [r, sec] = parseRoute(target);
+  if (!fromHistory && navDepth > 0 && r !== 'settings') { pendingGo = target; const n = navDepth; navDepth = 0; history.go(-n); return; }
   if (r === 'habits' && route !== 'habits') habitDay = today();
-  const same = route === r;
-  route = r; clearFx();
-  if (location.hash !== '#' + r) history.replaceState(null, '', '#' + r);
+  const same = route === r && settingsSec === sec;
+  const deeper = !fromHistory && r === 'settings' && (route !== 'settings' || (!settingsSec && sec));
+  route = r; settingsSec = sec; clearFx();
+  const h = '#' + r + (sec ? '/' + sec : '');
+  if (location.hash !== h) { if (deeper) { history.pushState(null, '', h); navDepth++; } else history.replaceState(null, '', h); }
   const swap = () => { render(true); document.querySelector('.nav-btn.on')?.classList.add('just'); };
   // A short crossfade between screens. The browser snapshots only what is on screen and fades the two pictures
   // on the GPU, so it stays smooth at 120 Hz. Skipped for reduced motion, Smooth graphics and software drawing.
@@ -81,7 +92,7 @@ function render(scrollTop = false) {
   const app = document.getElementById('app'), v = document.getElementById('view');
   if (!S.onboarded) { app.classList.add('onboarding'); paintView(v, 'onb' + onb.step, viewOnboarding(), scrollTop); renderNav(); return; }
   app.classList.remove('onboarding');
-  paintView(v, route, stableIds(({ today: viewToday, train: viewTrain, habits: viewHabits, fuel: viewFuel, me: viewMe, path: viewPath })[route]), scrollTop);
+  paintView(v, route, stableIds(({ today: viewToday, train: viewTrain, habits: viewHabits, fuel: viewFuel, me: viewMe, path: viewPath, settings: viewSettings })[route]), scrollTop);
   renderNav();
   if (scrollTop) {
     window.scrollTo({ top: 0 });
@@ -91,20 +102,20 @@ function render(scrollTop = false) {
   for (const [sel, cls] of fxQueue) document.querySelectorAll(sel).forEach(n => { n.classList.remove(cls); void n.offsetWidth; n.classList.add(cls); });
   fxQueue = [];
   countUps(scrollTop);
-  Motion.routeChanged(S.onboarded ? (route === 'path' ? 'Path to King' : (NAV.find(n => n.id === route) || {}).label || '') : '');
+  Motion.routeChanged(!S.onboarded ? '' : route === 'path' ? 'Path to King' : route === 'settings' ? ((SETTINGS_SECS.find(x => x.id === settingsSec) || {}).title || 'Settings') : (NAV.find(n => n.id === route) || {}).label || '');
   tick();
 }
 let fxQueue = [];
 const fx = (sel, cls) => fxQueue.push([sel, cls]);
 function renderNav() {
   const claim = S.onboarded ? claimableCount() : 0;
-  const ni = Math.max(0, NAV.findIndex(n => n.id === (route === 'path' ? 'me' : route)));
+  const ni = Math.max(0, NAV.findIndex(n => n.id === (route === 'path' || route === 'settings' ? 'me' : route)));
   const nav = document.getElementById('nav');
   nav.style.setProperty('--ni', ni); nav.style.setProperty('--nc', NAV.length);
   morphHTML(nav, `
     <i class="nav-pill" aria-hidden="true"></i>
     <div class="brand">${logoSVG({ size: 34 })}<span>ZELUM</span></div>
-    ${NAV.map(n => `<button class="nav-btn ${route === n.id || (route === 'path' && n.id === 'me') ? 'on' : ''}" data-go="${n.id}" aria-label="${n.label}">
+    ${NAV.map(n => `<button class="nav-btn ${route === n.id || ((route === 'path' || route === 'settings') && n.id === 'me') ? 'on' : ''}" data-go="${n.id}" aria-label="${n.label}">
       <span class="nav-ic">${icon(n.icon)}${n.id === 'today' && claim ? `<b class="dot">${claim}</b>` : ''}${n.id === 'train' && S.active ? '<b class="dot live"></b>' : ''}</span><span class="nav-l">${n.label}</span></button>`).join('')}
     <button class="nav-btn coach-side" data-act="coach"><span class="nav-ic">${icon('chat')}</span><span class="nav-l">Coach</span></button>`);
   document.getElementById('fab').style.display = S.onboarded ? '' : 'none';
@@ -473,7 +484,7 @@ function viewMe() {
   const labels = Array.from({ length: weeks }, (_, i) => fmtDate(addDays(wk0, i * 7), { month: 'numeric', day: 'numeric' }));
   const bw = S.bodyweight.slice(-30).map(b => ({ x: fmtDate(b.date, { month: 'short', day: 'numeric' }), y: b.kg }));
   const nBadges = Object.keys(S.badges).length;
-  return `${head('Me', 'Profile & progress')}
+  return `${head('Me', 'Profile & progress', `<button class="round-btn glass" data-go="settings" aria-label="Settings">${icon('settings')}</button>`)}
   <section class="hero me-hero glass">
     <div class="hero-art">${shieldSVG(rankIndex(li.lvl), 190)}</div>
     <div class="row center gap">
@@ -499,11 +510,30 @@ function viewMe() {
     ${card(`${cardHead('Workouts per week', '', 'chart')}${barChart(perWeek, labels, { goal: p.trainDays })}`)}
     ${card(`${cardHead('Habit consistency', '<span class="tiny muted">12 weeks</span>', 'calendar')}${heatmap(12, k => dayCompletion(k))}
       <div class="row gap mt-s"><button class="btn ghost sm" data-go="habits">${icon('habits', 'xs')} Open Habits</button></div>`)}
-    ${card(`${cardHead('Badges', `<span class="tiny muted">${nBadges}/${ACHIEVEMENTS.length}</span>`, 'trophy')}
-      <div class="badges">${ACHIEVEMENTS.map(a => `<div class="badge ${S.badges[a.id] ? 'on' : ''}" title="${esc(a.desc)}"><span>${icon(a.icon)}</span><b>${esc(a.name)}</b><small>${esc(a.desc)}</small></div>`).join('')}</div>`, 'span2')}
-    ${card(notifCardHTML(), 'notif-card')}
-    ${card(`${cardHead('Appearance', '', 'palette')}<p class="small muted" style="margin-bottom:12px">Choose a palette, then tune any color — accent, glows, XP, streak flames, water, food${faithOn() ? ', faith' : ''}.</p><div id="appearanceBody">${appearanceHTML()}</div>`, 'span2')}
-    ${card(`${cardHead('Settings', '', 'settings')}
+
+  </div>`;
+}
+
+/* =====================================================================
+   SETTINGS (v1.14.1) — everything that isn't progress, out of the Me screen.
+   A phone-style list; each row opens one section, so only that section is built and drawn.
+   Entering Settings or a section pushes a history entry, so Android's back button steps back out.
+   ===================================================================== */
+let settingsSec = null;
+const SETTINGS_SECS = [
+  { id: 'notifications', title: 'Notifications', icon: 'bell', c: 'var(--danger)', sub: () => S.settings.notif.enabled ? 'On' : 'Off' },
+  { id: 'appearance', title: 'Appearance & music colors', icon: 'palette', c: 'var(--accent)', sub: () => (THEMES[S.settings.theme.preset] || {}).name || 'Custom' },
+  { id: 'general', title: 'Training & app', icon: 'settings', c: 'var(--text-2)', sub: () => 'Days, goal, targets, sound, graphics' },
+  { id: 'badges', title: 'Badges', icon: 'trophy', c: 'var(--xp)', sub: () => `${Object.keys(S.badges).length} of ${ACHIEVEMENTS.length} earned` },
+  { id: 'data', title: 'Your data', icon: 'shield', c: 'var(--success)', sub: () => 'Backup, restore, reset' },
+];
+const SETTINGS_GROUPS = [['notifications', 'appearance'], ['general'], ['badges'], ['data']];
+function settingsSection(id) {
+  const p = S.profile, nBadges = Object.keys(S.badges).length;
+  switch (id) {
+    case 'notifications': return card(notifCardHTML(), 'notif-card');
+    case 'appearance': return card(`${cardHead('Appearance', '', 'palette')}<p class="small muted" style="margin-bottom:12px">Choose a palette, then tune any color — accent, glows, XP, streak flames, water, food${faithOn() ? ', faith' : ''}.</p><div id="appearanceBody">${appearanceHTML()}</div>`, 'span2');
+    case 'general': return card(`${cardHead('Settings', '', 'settings')}
       <button class="btn soft wide" data-act="trainSetup">${icon('dumbbell', 'sm')} Training setup — discipline, goal, level, days, equipment</button>
       <div class="form-grid mt">
         <label class="field"><span>Training days / week</span><select data-change="setting" data-k="trainDays">${[2, 3, 4, 5, 6].map(n => `<option ${p.trainDays === n ? 'selected' : ''}>${n}</option>`).join('')}</select></label>
@@ -520,8 +550,10 @@ function viewMe() {
       </div>
       ${Native.isApp && Native.renderMode ? '<p class="tiny muted mt-s">Seeing coloured dots or glitches while switching screens? Try another drawing mode; it applies instantly.</p>' : ''}
       <div class="nrow faith-row mt"><div class="grow"><b class="small">Faith mode</b><span class="tiny muted">Adds a verse of the day, Scripture in workouts and level-ups, prayer and Bible habits, and a daily faith mission.</span></div>
-        <button class="switch ${faithOn() ? 'on' : ''}" data-act="faithToggle" role="switch" aria-checked="${faithOn()}" aria-label="Faith mode"><i></i></button></div>`)}
-    ${card(`${cardHead('Your data', '', 'shield')}
+        <button class="switch ${faithOn() ? 'on' : ''}" data-act="faithToggle" role="switch" aria-checked="${faithOn()}" aria-label="Faith mode"><i></i></button></div>`);
+    case 'badges': return card(`${cardHead('Badges', `<span class="tiny muted">${nBadges}/${ACHIEVEMENTS.length}</span>`, 'trophy')}
+      <div class="badges">${ACHIEVEMENTS.map(a => `<div class="badge ${S.badges[a.id] ? 'on' : ''}" title="${esc(a.desc)}"><span>${icon(a.icon)}</span><b>${esc(a.name)}</b><small>${esc(a.desc)}</small></div>`).join('')}</div>`, 'span2');
+    case 'data': return card(`${cardHead('Your data', '', 'shield')}
       <p class="small muted">Everything is stored privately on this device and works offline. Export a backup regularly, and use it to move your progress between your phone and computer.</p>
       <div class="row gap mt wrap">
         <button class="btn soft" data-act="exportData">${icon('download', 'sm')} Export backup</button>
@@ -529,8 +561,21 @@ function viewMe() {
         ${installEvt ? `<button class="btn primary" data-act="install">${icon('download', 'sm')} Install app</button>` : ''}
         <button class="btn ghost danger-text" data-act="resetAll">${icon('trash', 'sm')} Reset</button>
       </div>
-      <p class="tiny muted mt">iPhone: open in Safari → Share → <b>Add to Home Screen</b>. Android/PC: browser menu → <b>Install app</b>. · <button class="link" data-act="whatsNew">v${VERSION} · What's new</button>${engineTag()}</p>`)}
-  </div>`;
+      <p class="tiny muted mt">iPhone: open in Safari → Share → <b>Add to Home Screen</b>. Android/PC: browser menu → <b>Install app</b>. · <button class="link" data-act="whatsNew">v${VERSION} · What's new</button>${engineTag()}</p>`);
+  }
+  return '';
+}
+function viewSettings() {
+  const sec = SETTINGS_SECS.find(x => x.id === settingsSec);
+  const back = `<button class="round-btn glass" data-act="settingsBack" aria-label="Back">${icon('right', 'flip')}</button>`;
+  if (sec) return `<header class="page-head set-head">${back}<div class="grow"><p class="eyebrow">Settings</p><h1>${sec.title}</h1></div></header>
+    <div class="set-body">${settingsSection(sec.id)}</div>`;
+  const row = x => `<button class="srow" data-go="settings/${x.id}"><span class="s-ic" style="--tc:${x.c}">${icon(x.icon, 'sm')}</span>
+    <span class="grow"><b>${x.title}</b><span>${esc(x.sub())}</span></span>${icon('right', 'sm s-chev')}</button>`;
+  return `<header class="page-head set-head">${back}<div class="grow"><p class="eyebrow">Me</p><h1>Settings</h1></div></header>
+    ${SETTINGS_GROUPS.map(g => `<div class="sgroup glass">${g.map(id => row(SETTINGS_SECS.find(x => x.id === id))).join('')}</div>`).join('')}
+    <div class="sgroup glass"><button class="srow" data-act="whatsNew"><span class="s-ic" style="--tc:var(--accent-hi)">${icon('info', 'sm')}</span>
+      <span class="grow"><b>What's new</b><span>Zelum ${VERSION}</span></span>${icon('right', 'sm s-chev')}</button></div>`;
 }
 
 /* =====================================================================
@@ -762,6 +807,7 @@ const Updater = {
    ACTIONS (click)
    ===================================================================== */
 const ACT = {
+  settingsBack: () => { if (navDepth > 0) history.back(); else go(settingsSec ? 'settings' : 'me'); },
   closeSheet: () => closeSheet(),
   confirmYes: () => { const cb = confirmCb; confirmCb = null; closeSheet(true); cb && cb(); },
   coach: () => openCoach(),
@@ -1088,8 +1134,12 @@ document.addEventListener('keydown', e => {
   if (e.key === 'Enter' && e.target.dataset && e.target.dataset.enter) { e.preventDefault(); ACT[e.target.dataset.enter]?.(e.target.dataset, e.target, e); }
   if (e.key === 'Escape') closeSheet();
 });
-window.addEventListener('hashchange', () => go(location.hash.slice(1)));
-window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; if (route === 'me') render(); });
+window.addEventListener('hashchange', () => {
+  if (pendingGo) { const t = pendingGo; pendingGo = null; go(t, true); return; }
+  navDepth = Math.max(0, navDepth - 1);
+  go(location.hash.slice(1), true);
+});
+window.addEventListener('beforeinstallprompt', e => { e.preventDefault(); installEvt = e; if (route === 'me' || route === 'settings') render(); });
 document.addEventListener('visibilitychange', () => { if (!document.hidden && S.onboarded) { if (fuelDay > today()) fuelDay = today(); render(); } });
 
 /* Boot */
@@ -1108,7 +1158,7 @@ Gfx.init();
 Motion.init();
 dayCompletion = memoState(dayCompletion);
 weeklyReview = memoState(weeklyReview);
-route = (location.hash || '#today').slice(1);
+[route, settingsSec] = parseRoute((location.hash || '#today').slice(1));
 render(true);
 setInterval(tick, 250);
 WhatsNew.maybeShow();   // once per update

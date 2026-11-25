@@ -25,7 +25,12 @@ const Motion = {
     document.addEventListener('pointerup', () => this.pressUp(false), o);
     document.addEventListener('pointercancel', () => this.pressUp(true), o);
   },
-  on() { return typeof Gfx === 'undefined' || Gfx.motion(); },
+  // Not tied to Graphics → Smooth: that setting only removes blur. (Tying them made the effects switch themselves
+  // off a few seconds in, when Auto picked Smooth on a phone.) Only reduced motion and software drawing turn them off.
+  on() {
+    if (matchMedia('(prefers-reduced-motion: reduce)').matches) return false;
+    return !(typeof Native !== 'undefined' && Native.renderMode === 'software');
+  },
   blocked(t) { return !this.view || (t && t.closest && t.closest('.sheet-wrap, #nav, .handback, input[type=range]')) || document.querySelector('.sheet-wrap'); },
   maxScroll() { return Math.max(0, document.documentElement.scrollHeight - innerHeight); },
 
@@ -35,6 +40,8 @@ const Motion = {
   down(e) {
     if (e.touches.length !== 1 || this.blocked(e.target) || !this.on()) { this.touching = false; return; }
     this.touching = true; this.anchor = null; this.mode = 0; this.lastY = e.touches[0].clientY;
+    // Finger down at an edge: get the moving layer ready now, so the first frame of a pull has nothing to prepare.
+    if (scrollY <= 1 || scrollY >= this.maxScroll() - 1) this.view.classList.add('elastic-ready');
     if (this.raf && Math.abs(this.pull) > 0.5) {   // caught mid-bounce: keep stretching from where it is
       cancelAnimationFrame(this.raf); this.raf = 0;
       this.mode = this.pull > 0 ? 1 : -1;
@@ -58,13 +65,15 @@ const Motion = {
   up() {
     if (!this.touching) return;
     this.touching = false; this.anchor = null;
-    if (Math.abs(this.pull) > 0.5) this.spring(0, 0.92);
+    if (Math.abs(this.pull) > 0.5) this.spring(0, 1);
+    else if (!this.raf) this.view.classList.remove('elastic-ready');
   },
   set(p) {
     this.pull = p;
     const v = this.view;
     if (Math.abs(p) < 0.4) {
       if (v.style.transform) { v.style.transform = ''; if (this.head) this.head.style.transform = ''; v.classList.remove('stretching'); }
+      if (!this.touching) v.classList.remove('elastic-ready');
       this.pull = 0; return;
     }
     if (!v.classList.contains('stretching')) {
@@ -75,10 +84,12 @@ const Motion = {
     // The title lags behind the content when pulled down, opening a soft gap (like the reference).
     if (this.head) this.head.style.transform = p > 0 ? `translate3d(0,${(-p * 0.55).toFixed(2)}px,0)` : '';
   },
-  // Damped spring toward 0. zeta < 1 overshoots a little; the bounce settles in about half a second.
+  // Damped spring toward 0, tuned like the system's own: release snaps home in ~0.25 s with no wobble (zeta 1);
+  // a fling bounce overshoots a touch (zeta 0.78). v1.14.0 used k=190, which felt slow and heavy.
   spring(v0, zeta) {
     cancelAnimationFrame(this.raf);
-    const k = 190, c = 2 * zeta * Math.sqrt(k);
+    if (!this.view.classList.contains('elastic-ready')) this.view.classList.add('elastic-ready');
+    const k = 420, c = 2 * zeta * Math.sqrt(k);
     this.vel = v0;
     let last = 0;
     const step = t => {
@@ -102,7 +113,7 @@ const Motion = {
     if (!this.touching && !this.raf && Math.abs(v) > 0.6 && this.on()) {
       const max = this.maxScroll();
       const hit = (y <= 0 && v < 0) ? 1 : (max > 0 && y >= max - 1 && v > 0) ? -1 : 0;
-      if (hit && !this.blocked()) this.spring(hit * Math.min(1300, Math.abs(v) * 380), 0.7);
+      if (hit && !this.blocked()) this.spring(hit * Math.min(1500, Math.abs(v) * 450), 0.78);
     }
     if (this.touching && this.pull && this.mode === 1 && y > 0) { this.anchor = null; this.mode = 0; this.spring(0, 1); }
     this.title();
@@ -136,7 +147,7 @@ const Motion = {
     // Small buttons keep their own press (scale) and never light up the card around them.
     const hit = e.target.closest && e.target.closest('[data-act],[data-go]');
     if (!hit || hit.matches('.btn,.icon-btn,.round-btn,.chip-btn,.switch,.swatch,.lvl-pill,#fab,select,input') || hit.offsetWidth < innerWidth * 0.45) return;
-    const el = hit.classList.contains('glass') ? hit : hit.closest('.glass');
+    const el = hit.classList.contains('glass') || hit.classList.contains('srow') ? hit : hit.closest('.glass');
     if (!el || el.closest('#nav') || el.offsetHeight > innerHeight * 0.4 || hit.offsetWidth < el.offsetWidth * 0.5) return;
     this.pel = el;
     // A short delay so a scroll that starts on a card doesn't flash it.

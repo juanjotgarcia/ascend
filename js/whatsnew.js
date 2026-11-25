@@ -10,6 +10,16 @@
 
 const RELEASES = [
   {
+    v: '1.14.1', date: '2026-11-24',
+    title: 'A cleaner Me',
+    intro: 'Me now shows just your progress. Everything else has its own Settings screen.',
+    items: [
+      ['new', 'Settings', 'Tap the gear on Me: notifications, appearance and music colors, training and app settings, badges and your data, each on its own page.'],
+      ['improved', 'Snappier motion', 'The stretch at the top and bottom springs back about twice as fast, and the title bar appears instantly.'],
+      ['fixed', 'Effects switching off', 'On some phones the stretch and touch effects turned themselves off a few seconds after opening the app. They now stay on.'],
+    ],
+  },
+  {
     v: '1.14.0', date: '2026-11-24',
     title: 'Fluid motion',
     intro: 'Zelum now moves like your phone\'s own apps: soft, springy and fast.',

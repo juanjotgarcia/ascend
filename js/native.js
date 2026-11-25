@@ -45,7 +45,7 @@ const Native = {
     document.addEventListener('visibilitychange', () => this.p.ledger.visible({ on: !document.hidden }).catch(() => { }));
     this.drain();
     this.checkExact();
-    this.p.ledger.rendering({}).then(r => { this.renderMode = r.mode; if (route === 'me') render(); }).catch(() => { });
+    this.p.ledger.rendering({}).then(r => { this.renderMode = r.mode; if ((route === 'me' || route === 'settings')) render(); }).catch(() => { });
     setTimeout(() => this.sync(true), 1500);
   },
 
@@ -74,7 +74,7 @@ const Native = {
     const was = this.exact;
     try { const r = await this.p.notif.checkExactNotificationSetting(); this.exact = r && r.exact_alarm === 'granted' ? 'granted' : 'denied'; }
     catch (e) { this.exact = 'na'; }
-    if (was !== null && was !== this.exact && route === 'me') render();
+    if (was !== null && was !== this.exact && (route === 'me' || route === 'settings')) render();
   },
   exactOn() { return this.exact === 'granted' || this.exact === 'na'; },
   /* Opens Android's "Alarms & reminders" switch for Zelum, then reschedules with whatever the user chose */
@@ -82,7 +82,7 @@ const Native = {
     try { await this.p.notif.changeExactNotificationSetting(); } catch (e) { }
     await this.checkExact();
     this.sync(true);
-    if (route === 'me') render();
+    if ((route === 'me' || route === 'settings')) render();
     toast(this.exactOn() ? 'Reminders will arrive at the exact minute' : 'Exact times are off — reminders may arrive a few minutes late');
   },
 
