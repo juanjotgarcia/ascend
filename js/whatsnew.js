@@ -10,6 +10,15 @@
 
 const RELEASES = [
   {
+    v: '1.15.2', date: '2026-11-26',
+    title: 'Put the workout bar where you want it',
+    intro: 'Hold the floating workout bar and drag it anywhere, or let go for a menu to shrink it or send it to the top, middle or bottom.',
+    items: [
+      ['new', 'Your workout color', 'While you train the bar takes the Live workout color (Me → Settings → Appearance). With music colors on, it follows the album.'],
+      ['new', 'Shrink it', 'A small pill with the ring and the time. Tap it to bring the full bar back.'],
+    ],
+  },
+  {
     v: '1.15.1', date: '2026-11-26',
     title: 'One glass bar for your workout',
     intro: 'The timer, the exercise you\'re on and the rest countdown now live in one bar that stays at the top while you scroll. Tap it for rest controls and Set done.',

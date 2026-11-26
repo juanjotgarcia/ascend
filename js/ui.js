@@ -70,8 +70,8 @@ let svgIdPrefix = '';
 function themeColors() {
   const t = S.settings.theme || {};
   const music = typeof Music !== 'undefined' && Music.overlay && Music.on() ? Music.overlay : {};
-  // Album colors repaint the rest timer too, unless the person picked their own rest color
-  const m = t.colors && t.colors.rest && music.rest ? { ...music, rest: t.colors.rest } : music;
+  // Album colors repaint the live workout bar too, except a color the person picked themselves
+  const m = { ...music }; for (const k of ['workout', 'rest']) if (t.colors && t.colors[k]) delete m[k];
   return { ...THEMES.midnight.colors, ...(THEMES[t.preset] || {}).colors, ...(t.colors || {}), ...m };
 }
 function hexToRgb(h) { const n = parseInt(h.replace('#', ''), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }

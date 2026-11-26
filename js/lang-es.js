@@ -2735,3 +2735,23 @@ Object.assign(LANG_ES, {
   "Habits fit the screen": "Los hábitos caben en la pantalla",
   "Long habit descriptions no longer push the habit list wider than the phone.": "Las descripciones largas de los hábitos ya no hacen la lista más ancha que el teléfono.",
 });
+
+
+/* ---------- moving and shrinking the workout bar, workout color (v1.15.2) ---------- */
+Object.assign(LANG_ES, {
+  "Live workout": "Entrenamiento en vivo",
+  "The workout bar while you train": "La barra del entrenamiento mientras entrenas",
+  "Shrink": "Encoger",
+  "Full size": "Tamaño completo",
+  "Top": "Arriba",
+  "Middle": "Al centro",
+  "Bottom": "Abajo",
+  "Hold and drag it anywhere": "Mantén presionado y arrástrala a donde quieras",
+  "Workout in progress — tap for the full bar": "Entrenamiento en curso — toca para ver la barra completa",
+  "Put the workout bar where you want it": "Pon la barra del entrenamiento donde quieras",
+  "Hold the floating workout bar and drag it anywhere, or let go for a menu to shrink it or send it to the top, middle or bottom.": "Mantén presionada la barra flotante del entrenamiento y arrástrala a donde quieras, o suéltala para ver un menú y encogerla o llevarla arriba, al centro o abajo.",
+  "Your workout color": "Tu color de entrenamiento",
+  "While you train the bar takes the Live workout color (Me → Settings → Appearance). With music colors on, it follows the album.": "Mientras entrenas, la barra toma el color de Entrenamiento en vivo (Perfil → Ajustes → Apariencia). Con los colores de música activados, sigue al álbum.",
+  "Shrink it": "Encógela",
+  "A small pill with the ring and the time. Tap it to bring the full bar back.": "Una pastilla pequeña con el anillo y el tiempo. Tócala para volver a la barra completa.",
+});

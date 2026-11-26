@@ -85,6 +85,11 @@ function setsProgress() {
 function liveBarHTML(where) {
   const w = S.active, ns = nextSet() || { done: true }, resting = !!rest, flash = !resting && Date.now() - restDoneAt < 4000;
   const c = liveClock(), head = where === 'head';
+  if (!head && LbPos.mini()) return `<div class="lb lb-mini glass ${resting ? 'resting' : ''} ${flash ? 'flash' : ''}" data-act="islandToggle" role="button" aria-label="Workout in progress — tap for the full bar">
+    <span class="lb-ring"><svg viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="15" class="lb-track"/>
+      <circle data-lb-ring cx="18" cy="18" r="15" class="lb-arc" stroke-dasharray="${LB_C}" style="stroke-dashoffset:${(LB_C * (1 - (resting ? c.frac : setsProgress()))).toFixed(2)}" transform="rotate(-90 18 18)"/></svg>
+      ${resting ? `<b class="lb-count" data-lb-left>${mmss(Math.ceil(c.left))}</b>` : '<i class="lb-dot"></i>'}</span>
+    <b class="lb-mtime">${resting ? 'Rest' : `<span data-lb-elapsed>${mmss(c.el)}</span>`}</b></div>`;
   const ring = resting ? c.frac : setsProgress();
   const target = ns.done ? '' : `${ns.t ?? ''}${ns.u || ' reps'}${ns.kg ? ` · ${ns.kgTxt}` : ''}`;
   const title = resting ? 'Rest' : flash ? 'Rest over — next set' : ns.done ? 'All sets done — finish when ready' : ns.name;
@@ -112,7 +117,7 @@ function liveBarHTML(where) {
 }
 function liveSig() {
   const ns = nextSet() || {};
-  return [!!rest, rest && rest.total, islandOpen, Date.now() - restDoneAt < 4000, ns.done ? 'done' : `${ns.name}|${ns.n}|${ns.of}|${ns.t}|${ns.kg}`, S.active.name, route].join('|');
+  return [!!rest, rest && rest.total, islandOpen, LbPos.mini(), Date.now() - restDoneAt < 4000, ns.done ? 'done' : `${ns.name}|${ns.n}|${ns.of}|${ns.t}|${ns.kg}`, S.active.name, route].join('|');
 }
 /* Kept under its old name: tick(), the native bridge and the actions call it */
 function renderIsland() {
@@ -120,14 +125,14 @@ function renderIsland() {
   const on = S.onboarded && S.active;
   const head = on && route === 'train' ? document.querySelector('.live-head') : null;
   const float = on && !head && route !== 'train';
-  if (!on) { if (box.className) { box.className = ''; box.innerHTML = ''; box.__html = ''; } islandSig = ''; return; }
+  if (!on) { if (box.className) { box.className = ''; box.innerHTML = ''; box.__html = ''; closeLbMenu(); } islandSig = ''; return; }
   const sig = liveSig();
   if (sig !== islandSig) {
     islandSig = sig;
     if (head) morphHTML(head, liveBarHTML('head'));
-    if (float) { box.className = 'on'; morphHTML(box, liveBarHTML('island')); }
+    if (float) { box.classList.add('on'); morphHTML(box, liveBarHTML('island')); requestAnimationFrame(() => LbPos.apply(box)); }
   }
-  if (!float && box.className) box.className = '';
+  if (!float && box.className) { box.className = ''; closeLbMenu(); }
   // Clock and ring, every tick, in whichever bar is showing
   const c = liveClock();
   document.querySelectorAll('[data-lb-elapsed]').forEach(n => setText(n, mmss(c.el)));
@@ -143,6 +148,105 @@ function restFinished() {
     const body = ns && !ns.done ? `Set ${ns.n} of ${ns.name}${ns.t ? ` · ${ns.t}${ns.u}` : ''}` : 'Finish strong.';
     notify({ title: 'Rest over — next set', body, ic: 'bolt', tone: 'accent', sound: '', go: 'train', tag: 'rest' });
   } else { restDoneAt = Date.now(); setTimeout(() => { islandSig = ''; renderIsland(); }, 4050); }
+}
+
+/* ---------- Moving and shrinking the floating bar (v1.15.2) ----------
+   The floating bar (other tabs) must never hide what's under it, like the palette button or the Settings gear.
+   • Hold it 0.35 s: it lifts (haptic). Drag it anywhere and let go; it stays there.
+   • Hold and let go without moving: a small glass menu — Shrink / Full size, Top, Middle, Bottom.
+   • Shrunk, it is a pill with the ring and the time; tap it to bring the full bar back.
+   Saved per device as fractions of the free space, so it lands in the same spot after rotating or resizing.
+   While dragging only #island's transform changes (no layout); the drop eases in with a spring.
+   The Train header stays where it is: it's part of the workout page, not floating over another one. */
+const LbPos = {
+  KEY: 'ledger.lbPos',
+  s: (() => { try { return JSON.parse(localStorage.getItem('ledger.lbPos')) || {}; } catch (e) { return {}; } })(),   // { x, y: 0..1, mini }
+  save() { try { localStorage.setItem(this.KEY, JSON.stringify(this.s)); } catch (e) { } },
+  mini() { return !!this.s.mini; },
+  // Free space for #island's translate: from where CSS puts it (top, left) to above the tab bar / right edge
+  room(box) {
+    const nav = document.getElementById('nav'), nr = nav && nav.getBoundingClientRect();
+    const bottom = nr && nr.height && nr.top > innerHeight / 2 ? nr.top : innerHeight;
+    return { x: Math.max(0, innerWidth - 12 - box.offsetLeft - box.offsetWidth), y: Math.max(0, bottom - 10 - box.offsetTop - box.offsetHeight) };
+  },
+  px(box) { const r = this.room(box); return { x: this.mini() ? (this.s.x ?? 0.5) * r.x : 0, y: (this.s.y ?? 0) * r.y, r }; },
+  apply(box) {
+    if (!box || !box.classList.contains('on')) return;
+    const p = this.px(box);
+    box.style.setProperty('--ix', `${p.x.toFixed(1)}px`); box.style.setProperty('--iy', `${p.y.toFixed(1)}px`);
+    box.classList.toggle('up', (this.s.y ?? 0) > 0.5);              // the panel opens upward near the bottom
+    box.classList.toggle('at-top', p.y < 40);                        // banners make room only when it's at the top
+  },
+  set(patch) { Object.assign(this.s, patch); this.save(); islandSig = ''; renderIsland(); },
+};
+(() => {
+  const box = document.getElementById('island'); if (!box) return;
+  let t = 0, sx = 0, sy = 0, base = null, lifted = false, moved = false, eat = false, pid = null;
+  const cancel = () => { clearTimeout(t); t = 0; };
+  box.addEventListener('pointerdown', e => {
+    if (!box.classList.contains('on') || e.button > 0 || e.target.closest('button, .lb-panel')) return;
+    closeLbMenu();
+    sx = e.clientX; sy = e.clientY; moved = false; pid = e.pointerId;
+    t = setTimeout(() => {   // long-press: lift
+      t = 0; lifted = true; base = LbPos.px(box);
+      try { box.setPointerCapture(pid); } catch (er) { }
+      box.classList.add('lifted'); haptic(14); SFX.play('tap');
+      if (islandOpen) { islandOpen = false; islandSig = ''; renderIsland(); }
+    }, 350);
+  });
+  box.addEventListener('pointermove', e => {
+    const dx = e.clientX - sx, dy = e.clientY - sy;
+    if (!lifted) { if (t && Math.hypot(dx, dy) > 8) cancel(); return; }
+    if (Math.hypot(dx, dy) > 6) moved = true;
+    const r = base.r, x = LbPos.mini() ? Math.min(r.x, Math.max(0, base.x + dx)) : 0, y = Math.min(r.y, Math.max(0, base.y + dy));
+    box.style.transform = `translate3d(${x}px, ${y}px, 0)`;
+    box.__drop = { x, y, r };
+  });
+  const end = () => {
+    cancel();
+    if (!lifted) return;
+    lifted = false; eat = true; box.classList.remove('lifted');
+    const d = box.__drop; box.__drop = null;
+    // Park it where the finger left it (same values as the inline transform, so nothing jumps), then save
+    if (moved && d) { box.style.setProperty('--ix', `${d.x}px`); box.style.setProperty('--iy', `${d.y}px`); }
+    box.style.transform = '';
+    if (moved && d) { haptic(8); LbPos.set({ y: d.r.y ? d.y / d.r.y : 0, x: d.r.x ? d.x / d.r.x : 0.5 }); }
+    else openLbMenu();
+  };
+  box.addEventListener('pointerup', end);
+  box.addEventListener('pointercancel', end);
+  box.addEventListener('contextmenu', e => e.preventDefault());   // no Android text/long-press menu
+  // The click that follows a long-press must not also toggle the bar
+  box.addEventListener('click', e => { if (eat) { eat = false; e.stopPropagation(); e.preventDefault(); } }, true);
+  addEventListener('resize', () => LbPos.apply(box), { passive: true });
+})();
+function openLbMenu() {
+  const box = document.getElementById('island'), bar = box && box.querySelector('.lb'); if (!bar) return;
+  let m = document.getElementById('lbmenu');
+  if (!m) { m = document.createElement('div'); m.id = 'lbmenu'; m.setAttribute('role', 'menu'); document.body.appendChild(m); }
+  const y = LbPos.s.y ?? 0, mini = LbPos.mini();
+  const item = (act, ic, label, on = false, extra = '') => `<button class="lbm-i ${on ? 'on' : ''}" role="menuitem" data-act="${act}" ${extra}>${icon(ic, 'sm')}<span>${label}</span></button>`;
+  m.innerHTML = `<div class="lbm glass">
+    ${item('lbMini', mini ? 'plus' : 'minus', mini ? 'Full size' : 'Shrink')}
+    <div class="lbm-sep"></div>
+    ${item('lbPlace', 'up', 'Top', y < 0.15, 'data-y="0"')}
+    ${item('lbPlace', 'target', 'Middle', y >= 0.15 && y <= 0.85, 'data-y="0.5"')}
+    ${item('lbPlace', 'down', 'Bottom', y > 0.85, 'data-y="1"')}
+    <p class="lbm-hint">Hold and drag it anywhere</p></div>`;
+  // Next to the bar: below it in the top half, above it in the bottom half
+  const r = bar.getBoundingClientRect(), mw = 230, below = r.top + r.height / 2 < innerHeight / 2;
+  const left = Math.min(innerWidth - mw - 10, Math.max(10, r.left + r.width / 2 - mw / 2));
+  m.style.left = `${left}px`; m.style.width = `${mw}px`;
+  m.style.top = below ? `${r.bottom + 10}px` : ''; m.style.bottom = below ? '' : `${innerHeight - r.top + 10}px`;
+  m.className = below ? 'from-top' : 'from-bottom';
+  requestAnimationFrame(() => m.classList.add('on'));
+  setTimeout(() => document.addEventListener('pointerdown', lbMenuOutside, true), 0);
+}
+function lbMenuOutside(e) { if (!e.target.closest('#lbmenu')) closeLbMenu(); }
+function closeLbMenu() {
+  document.removeEventListener('pointerdown', lbMenuOutside, true);
+  const m = document.getElementById('lbmenu'); if (!m || !m.classList.contains('on')) return;
+  m.classList.remove('on'); setTimeout(() => { if (!m.classList.contains('on')) m.innerHTML = ''; }, 300);
 }
 
 /* ---------- Reminders ---------- */
@@ -211,7 +315,9 @@ function notifCardHTML() {
 }
 
 const NOTIF_ACT = {
-  islandToggle: (d, el, e) => { if (e && e.target.closest('button')) return; islandOpen = !islandOpen; islandSig = ''; SFX.play('tap'); renderIsland(); },
+  islandToggle: (d, el, e) => { if (e && e.target.closest('button')) return; if (LbPos.mini() && el.closest('#island')) { LbPos.set({ mini: false }); SFX.play('tap'); return; } islandOpen = !islandOpen; islandSig = ''; SFX.play('tap'); renderIsland(); },
+  lbMini: () => { closeLbMenu(); haptic(8); LbPos.set({ mini: !LbPos.mini() }); },
+  lbPlace: d => { closeLbMenu(); haptic(8); LbPos.set({ y: +d.y }); },
   lbGoEx: d => { islandOpen = false; islandSig = ''; renderIsland(); const el = document.getElementById(`ex-${d.e}`); if (el) el.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' }); },
   islandSetDone: () => {
     const w = S.active; if (!w) return;

@@ -326,7 +326,8 @@ const THEME_ROLES = [
   ['glow2',   'Second glow',       'Light at the bottom'],
   ['xp',      'XP & rewards',      'Levels, missions, Main Quest'],
   ['streak',  'Streak flames',     'Fire and streak counters'],
-  ['success', 'Completed',         'Checks, done habits, PRs, the live workout'],
+  ['success', 'Completed',         'Checks, done habits, PRs'],
+  ['workout', 'Live workout',      'The workout bar while you train'],
   ['rest',    'Rest timer',        'The workout bar while you rest'],
   ['water',   'Water',             'Hydration rings'],
   ['kcal',    'Calories',          'Calorie ring'],
@@ -345,8 +346,8 @@ const THEMES = {
   royal:    { name: 'Royal',    colors: { accent: '#bf5af2', accent2: '#5e5ce6', glow1: '#4a1a8a', glow2: '#3d2c05', xp: '#ffd60a', streak: '#ff9f0a', success: '#30d158', water: '#64d2ff', kcal: '#ff9f0a', protein: '#ff375f', faith: '#ffd60a', danger: '#ff453a', logo: '#ffd60a', logoBg: '#000000' } },
   mono:     { name: 'Graphite', colors: { accent: '#f2f2f7', accent2: '#8e8e93', glow1: '#3a3a3f', glow2: '#1a1a1c', xp: '#e5e5ea', streak: '#ff9f0a', success: '#30d158', water: '#c7c7cc', kcal: '#aeaeb2', protein: '#8e8e93', faith: '#d1d1d6', danger: '#ff453a', logo: '#ffffff', logoBg: '#000000' } },
 };
-/* Rest timer color (v1.15.1): each palette rests in its blend color */
-for (const t of Object.values(THEMES)) if (!t.colors.rest) t.colors.rest = t.colors.accent2;
+/* Live workout bar (v1.15.1–1.15.2): green while training, the palette's blend color while resting */
+for (const t of Object.values(THEMES)) { if (!t.colors.workout) t.colors.workout = t.colors.success; if (!t.colors.rest) t.colors.rest = t.colors.accent2; }
 
 /* ---------- Achievements ---------- */
 const ACHIEVEMENTS = [
