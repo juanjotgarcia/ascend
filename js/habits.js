@@ -9,7 +9,7 @@ const HABIT_KINDS = {
   quit:  { name: 'Break free', sub: 'Stop a bad habit, track clean time', icon: 'ban' },
 };
 const TODS = { morning: 'Morning', afternoon: 'Afternoon', evening: 'Evening', any: 'Anytime' };
-const DOW1 = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+const DOW1 = LANG === 'es' ? ['D', 'L', 'M', 'X', 'J', 'V', 'S'] : ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 const DOW3 = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const QUIT_MILESTONES = [1, 3, 7, 14, 30, 60, 90, 180, 365];
 const MILESTONE_XP = { 1: 10, 3: 25, 7: 60, 14: 100, 30: 200, 60: 300, 90: 450, 180: 700, 365: 1200 };
@@ -322,9 +322,9 @@ function calendarHTML(h, id) {
     cells += `<i class="${cls}">${d}</i>`;
   }
   const canNext = `${y}-${pad(m)}` < k.slice(0, 7);
-  return `<div class="cal-head"><h3>${icon('calendar', 'sm')} ${first.toLocaleDateString('en-US', { month: 'long', year: y !== parseDay(k).getFullYear() ? 'numeric' : undefined })}</h3>
+  return `<div class="cal-head"><h3>${icon('calendar', 'sm')} ${first.toLocaleDateString(LOCALE, { month: 'long', year: y !== parseDay(k).getFullYear() ? 'numeric' : undefined })}</h3>
       <div class="row gap-s"><button class="icon-btn" data-act="habitMonth" data-id="${id}" data-d="-1" aria-label="Previous month">${icon('left', 'sm')}</button><button class="icon-btn" data-act="habitMonth" data-id="${id}" data-d="1" ${canNext ? '' : 'disabled'} aria-label="Next month">${icon('right', 'sm')}</button></div></div>
-    <div class="cal-dow">${['M', 'T', 'W', 'T', 'F', 'S', 'S'].map(x => `<span>${x}</span>`).join('')}</div>
+    <div class="cal-dow">${(LANG === 'es' ? ['L', 'M', 'X', 'J', 'V', 'S', 'D'] : ['M', 'T', 'W', 'T', 'F', 'S', 'S']).map(x => `<span>${x}</span>`).join('')}</div>
     <div class="cal">${cells}</div>`;
 }
 function sheetTop(h) {
@@ -378,7 +378,7 @@ function quitSheet(h) {
     ${sheetTop(h)}
     <h2 class="hd-title mt">${icon(h.icon || 'ban')}${esc(h.name)}</h2>
     ${h.why ? `<p class="why center-t">“${esc(h.why)}”</p>` : ''}
-    <div class="q-big"><span class="tiny muted">Free for</span><b data-quit-clock="${h.id}">${clockText(Date.now() - quitRunStart(h))}</b><span class="small muted">since ${new Date(quitRunStart(h)).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</span></div>
+    <div class="q-big"><span class="tiny muted">Free for</span><b data-quit-clock="${h.id}">${clockText(Date.now() - quitRunStart(h))}</b><span class="small muted">since ${new Date(quitRunStart(h)).toLocaleString(LOCALE, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</span></div>
     <div class="miles">${QUIT_MILESTONES.map(m => `<div class="mile ${days >= m ? 'on' : ''}"><span>${days >= m ? flame() : icon('shield', 'xs')}</span><b>${m >= 365 ? '1y' : m + 'd'}</b></div>`).join('')}</div>
     <div class="hd-grid">
       <div><b>${days}</b><span>Days free</span></div>
@@ -390,7 +390,7 @@ function quitSheet(h) {
       <button class="btn ghost grow danger-text" data-act="slip" data-id="${h.id}">I slipped</button></div>
     ${faithOn() ? '<p class="verse-text small mt center-t">“For a just man falleth seven times, and riseth up again.”</p><p class="verse-ref center-t">Proverbs 24:16</p>' : '<p class="quote small mt center-t">Fall seven times, stand up eight.</p>'}
     ${calendarHTML(h, h.id)}
-    ${slips.length ? `<h4 class="mt">${icon('calendar', 'sm')} Slip history</h4><ul class="slips">${slips.map(s => `<li><span>${new Date(s.t).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</span><span class="muted">${esc([s.trigger, s.note].filter(Boolean).join(' · ') || '—')}</span></li>`).join('')}</ul>` : ''}
+    ${slips.length ? `<h4 class="mt">${icon('calendar', 'sm')} Slip history</h4><ul class="slips">${slips.map(s => `<li><span>${new Date(s.t).toLocaleString(LOCALE, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</span><span class="muted">${esc([s.trigger, s.note].filter(Boolean).join(' · ') || '—')}</span></li>`).join('')}</ul>` : ''}
   </div>`;
 }
 function slipSheet(id) {

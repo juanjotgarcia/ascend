@@ -33,6 +33,7 @@ function notify({ title, body = '', ic = 'bell', tone = 'accent', art = '', soun
   return el;
 }
 async function sysNotify(title, body, tag, to = '') {
+  title = tr(title); body = tr(body);   // a system notification is plain text, so translate it here
   if (Native.isApp) return;   // native notifications handle the background in the Android app
   try {
     if (!('Notification' in window) || Notification.permission !== 'granted') return;
@@ -107,7 +108,7 @@ const NOTIF_DEFAULTS = { enabled: false, workout: { on: true, time: '17:00' }, w
 const toMin = hm => { const [h, m] = String(hm || '0:0').split(':').map(Number); return h * 60 + (m || 0); };
 // toLocaleTimeString is slow (~0.2 ms a call) and the Me screen re-renders often: remember each answer.
 const fmtHMMemo = new Map();
-const fmtHM = hm => { let s = fmtHMMemo.get(hm); if (s === undefined) { const [h, m] = hm.split(':').map(Number); s = new Date(2000, 0, 1, h, m).toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' }); fmtHMMemo.set(hm, s); } return s; };
+const fmtHM = hm => { let s = fmtHMMemo.get(hm); if (s === undefined) { const [h, m] = hm.split(':').map(Number); s = new Date(2000, 0, 1, h, m).toLocaleTimeString(LOCALE, { hour: 'numeric', minute: '2-digit' }); fmtHMMemo.set(hm, s); } return s; };
 function todaysReminders() { return remindersFor(today()); }
 /* Reminders for any day (future days assume nothing is done yet; the app reschedules after every change) */
 function remindersFor(k) {

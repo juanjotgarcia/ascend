@@ -53,6 +53,7 @@ const ICONS = {
   bell: '<path d="M6 16V11a6 6 0 0 1 12 0v5l1.5 2h-15z"/><path d="M10 20.5a2 2 0 0 0 4 0"/>',
   palette: '<path d="M12 3a9 9 0 1 0 0 18c1.2 0 2-.8 2-1.8 0-.5-.2-.9-.5-1.3-.3-.3-.5-.7-.5-1.2 0-1 .8-1.7 1.8-1.7H17a4 4 0 0 0 4-4c0-4.4-4-8-9-8z"/><circle cx="7.5" cy="11" r="1.2"/><circle cx="10" cy="7" r="1.2"/><circle cx="15" cy="7.5" r="1.2"/>',
   undo: '<path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/>',
+  globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"/>',
   laurel: '<path d="M7 4c-3 3-3 10 1 14M17 4c3 3 3 10-1 14M5 9c1 .5 2 .5 3 0M4.5 13c1.2.3 2.3.1 3.2-.6M19 9c-1 .5-2 .5-3 0M19.5 13c-1.2.3-2.3.1-3.2-.6"/>',
 };
 /* Solid flame used for streak counters */
@@ -112,7 +113,7 @@ const fmtDateMemo = new Map();
 function fmtDate(k, opts = { weekday: 'short', month: 'short', day: 'numeric' }) {
   const key = k + '|' + (opts.weekday || '') + (opts.month || '') + (opts.day || '') + (opts.year || '');
   let s = fmtDateMemo.get(key);
-  if (s === undefined) { if (fmtDateMemo.size > 2000) fmtDateMemo.clear(); s = parseDay(k).toLocaleDateString('en-US', opts); fmtDateMemo.set(key, s); }
+  if (s === undefined) { if (fmtDateMemo.size > 2000) fmtDateMemo.clear(); s = parseDay(k).toLocaleDateString(LOCALE, opts); fmtDateMemo.set(key, s); }
   return s;
 }
 /* Wraps a function whose result only depends on the saved state (and today's date): repeated calls between two
@@ -129,7 +130,7 @@ function memoState(fn) {
 }
 function relDay(k) {
   const d = daysBetween(k, today());
-  return d === 0 ? 'Today' : d === 1 ? 'Yesterday' : d < 7 ? parseDay(k).toLocaleDateString('en-US', { weekday: 'long' }) : fmtDate(k);
+  return d === 0 ? 'Today' : d === 1 ? 'Yesterday' : d < 7 ? parseDay(k).toLocaleDateString(LOCALE, { weekday: 'long' }) : fmtDate(k);
 }
 
 /* ---------- Rings & bars ---------- */

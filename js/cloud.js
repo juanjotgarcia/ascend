@@ -212,7 +212,7 @@ function conflictSheet(cloud, cm) {
     const xp = Object.values(st.xpLog || {}).reduce((a, v) => a + v[0], 0);
     return `${(st.workouts || []).length} workouts · level ${levelFromXP(xp)} · ${fmtN(xp)} XP`;
   };
-  const when = t => t ? new Date(t).toLocaleString('en-US', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—';
+  const when = t => t ? new Date(t).toLocaleString(LOCALE, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }) : '—';
   return `<h3 class="sheet-title">Which progress should Zelum keep?</h3>
     <p class="small muted">This device and your Google account both have changes. The one you don't pick is kept as a safety copy on this device.</p>
     <button class="choice glass-btn mt" data-act="cloudKeep" data-v="cloud" style="width:100%"><b>${icon('upload', 'sm')} Google account</b><span class="small muted">${sum(cloud)} · saved ${when(cm.updated)}</span></button>

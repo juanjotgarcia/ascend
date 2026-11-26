@@ -10,6 +10,16 @@
 
 const RELEASES = [
   {
+    v: '1.15.0', date: '2026-11-26',
+    title: 'Zelum in Spanish',
+    intro: 'The whole app now speaks Spanish: screens, Coach Caleb, reminders and the exercise library.',
+    items: [
+      ['new', 'Choose your language', 'Me → Settings → Language: Automatic (follows your phone), English or Español. You can also pick it on the welcome screen.'],
+      ['new', 'Caleb understands Spanish', 'Ask “¿qué entreno hoy?”, or tell him “peso 62 kg” or “tomé 2 vasos” and he logs it.'],
+      ['improved', 'Privacy policy link', 'Me → Settings → Your data now links to the privacy policy.'],
+    ],
+  },
+  {
     v: '1.14.1', date: '2026-11-24',
     title: 'A cleaner Me',
     intro: 'Me now shows just your progress. Everything else has its own Settings screen.',

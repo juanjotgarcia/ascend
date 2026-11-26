@@ -1,6 +1,6 @@
 /* ZELUM — views, navigation and actions. */
 
-const VERSION = '1.14.1';
+const VERSION = '1.15.0';
 /* Browser engine version (the Android app's WebView updates separately from Chrome), shown under Me for support */
 const engineTag = () => { const m = navigator.userAgent.match(/Chrome\/(\d+)/); return m ? ` · ${/LedgerAndroid|; wv\)/.test(navigator.userAgent) ? 'WebView' : 'Chrome'} ${m[1]}` : ''; };
 const NAV = [
@@ -102,7 +102,7 @@ function render(scrollTop = false) {
   for (const [sel, cls] of fxQueue) document.querySelectorAll(sel).forEach(n => { n.classList.remove(cls); void n.offsetWidth; n.classList.add(cls); });
   fxQueue = [];
   countUps(scrollTop);
-  Motion.routeChanged(!S.onboarded ? '' : route === 'path' ? 'Path to King' : route === 'settings' ? ((SETTINGS_SECS.find(x => x.id === settingsSec) || {}).title || 'Settings') : (NAV.find(n => n.id === route) || {}).label || '');
+  Motion.routeChanged(tr(!S.onboarded ? '' : route === 'path' ? 'Path to King' : route === 'settings' ? ((SETTINGS_SECS.find(x => x.id === settingsSec) || {}).title || 'Settings') : (NAV.find(n => n.id === route) || {}).label || ''));
   tick();
 }
 let fxQueue = [];
@@ -137,7 +137,7 @@ function viewToday() {
   return `
   <header class="today-head">
     <button class="round-btn glass" data-act="appearance" aria-label="Appearance and colors">${icon('palette')}</button>
-    <p class="title">Today<span>, ${d.getDate()} ${d.toLocaleDateString('en-US', { month: 'short' })}</span></p>
+    <p class="title">Today<span>, ${d.getDate()} ${d.toLocaleDateString(LOCALE, { month: 'short' })}</span></p>
     <button class="lvl-pill glass" data-go="path" aria-label="Level ${li.lvl}, view path">${ring({ pct: li.pct, size: 38, sw: 3.5, color: 'var(--xp)', inner: `<b>${li.lvl}</b>` })}</button>
   </header>
   <h1 class="hello">${greeting()}${S.profile.name ? ', ' + esc(S.profile.name) : ''}</h1>
@@ -327,7 +327,7 @@ function viewActive() {
         <div class="row gap-s wrap mt-s ex-meta">${e.lo ? `<span class="chip xs">${icon('target', 'xs')} ${e.lo}–${e.hi}${u || ' reps'}</span>` : ''}<button class="chip xs chip-tap" data-act="cycleRest" data-e="${ei}">${icon('timer', 'xs')} Rest ${rest >= 60 ? `${Math.floor(rest / 60)}:${pad(rest % 60)}` : rest + 's'}</button>${plates ? `<span class="chip xs">${esc(plates)}</span>` : ''}</div>
         ${warmupTip(e, ei)}
         <div class="sets">
-          <div class="set-row head"><span>Set</span><span>Target</span><span>${ex.kind === 'hold' ? 'Seconds' : 'Reps'}</span>${loadable ? `<span>${gym ? 'kg' : '+kg'}</span>` : '<span></span>'}<span></span></div>
+          <div class="set-row head"><span data-i18n="col">Set</span><span data-i18n="col">Target</span><span data-i18n="col">${ex.kind === 'hold' ? 'Seconds' : 'Reps'}</span>${loadable ? `<span>${gym ? 'kg' : '+kg'}</span>` : '<span></span>'}<span></span></div>
           ${e.sets.map((s, si) => `<div class="set-row ${s.done ? 'done' : ''}" data-sid="${ei}-${si}">
             <span class="set-n">${si + 1}</span>
             <span class="muted">${s.t ?? '—'}${u}</span>
@@ -523,15 +523,18 @@ let settingsSec = null;
 const SETTINGS_SECS = [
   { id: 'notifications', title: 'Notifications', icon: 'bell', c: 'var(--danger)', sub: () => S.settings.notif.enabled ? 'On' : 'Off' },
   { id: 'appearance', title: 'Appearance & music colors', icon: 'palette', c: 'var(--accent)', sub: () => (THEMES[S.settings.theme.preset] || {}).name || 'Custom' },
+  { id: 'language', title: 'Language', icon: 'globe', c: 'var(--accent-hi)', sub: () => langName(I18N.pref) },
   { id: 'general', title: 'Training & app', icon: 'settings', c: 'var(--text-2)', sub: () => 'Days, goal, targets, sound, graphics' },
   { id: 'badges', title: 'Badges', icon: 'trophy', c: 'var(--xp)', sub: () => `${Object.keys(S.badges).length} of ${ACHIEVEMENTS.length} earned` },
   { id: 'data', title: 'Your data', icon: 'shield', c: 'var(--success)', sub: () => 'Backup, restore, reset' },
 ];
-const SETTINGS_GROUPS = [['notifications', 'appearance'], ['general'], ['badges'], ['data']];
+const SETTINGS_GROUPS = [['notifications', 'appearance'], ['general', 'language'], ['badges'], ['data']];
 function settingsSection(id) {
   const p = S.profile, nBadges = Object.keys(S.badges).length;
   switch (id) {
     case 'notifications': return card(notifCardHTML(), 'notif-card');
+    case 'language': return card(`${cardHead('Language', '', 'globe')}<p class="small muted">Zelum's screens, coach and reminders. Your own habit names and notes stay as you wrote them.</p>
+      <div class="choice-list mt">${LANGS.map(([v, l]) => `<button class="choice glass-btn ${I18N.pref === v ? 'on' : ''}" data-act="setLang" data-v="${v}"><b>${l}</b>${v === 'auto' ? `<span class="small muted">Follows your phone · ${langName(I18N.sys)}</span>` : ''}</button>`).join('')}</div>`);
     case 'appearance': return card(`${cardHead('Appearance', '', 'palette')}<p class="small muted" style="margin-bottom:12px">Choose a palette, then tune any color — accent, glows, XP, streak flames, water, food${faithOn() ? ', faith' : ''}.</p><div id="appearanceBody">${appearanceHTML()}</div>`, 'span2');
     case 'general': return card(`${cardHead('Settings', '', 'settings')}
       <button class="btn soft wide" data-act="trainSetup">${icon('dumbbell', 'sm')} Training setup — discipline, goal, level, days, equipment</button>
@@ -561,10 +564,11 @@ function settingsSection(id) {
         ${installEvt ? `<button class="btn primary" data-act="install">${icon('download', 'sm')} Install app</button>` : ''}
         <button class="btn ghost danger-text" data-act="resetAll">${icon('trash', 'sm')} Reset</button>
       </div>
-      <p class="tiny muted mt">iPhone: open in Safari → Share → <b>Add to Home Screen</b>. Android/PC: browser menu → <b>Install app</b>. · <button class="link" data-act="whatsNew">v${VERSION} · What's new</button>${engineTag()}</p>`);
+      <p class="tiny muted mt">iPhone: open in Safari → Share → <b>Add to Home Screen</b>. Android/PC: browser menu → <b>Install app</b>. · <button class="link" data-act="whatsNew">v${VERSION} · What's new</button> · <button class="link" data-act="privacy">Privacy policy</button>${engineTag()}</p>`);
   }
   return '';
 }
+const langName = v => v === 'auto' ? `Automatic · ${langName(I18N.sys)}` : (LANGS.find(x => x[0] === v) || LANGS[1])[1];
 function viewSettings() {
   const sec = SETTINGS_SECS.find(x => x.id === settingsSec);
   const back = `<button class="round-btn glass" data-act="settingsBack" aria-label="Back">${icon('right', 'flip')}</button>`;
@@ -588,7 +592,8 @@ function viewOnboarding() {
   const steps = [
     () => `<div class="onb-hero">${logoSVG({ size: 110, cls: 'onb-logo' })}<h1 class="display">ZELUM</h1>
       <p class="lead">Every rep, every meal, every habit&nbsp;— tracked.<br>Calisthenics. Gym. Discipline.</p>
-      <p class="quote mt">Small daily wins compound into the impossible.</p></div>`,
+      <p class="quote mt">Small daily wins compound into the impossible.</p>
+      <div class="seg sm onb-lang mt" role="group" aria-label="Language">${LANGS.slice(1).map(([v, l]) => `<button class="${LANG === v ? 'on' : ''}" data-act="setLang" data-v="${v}">${l}</button>`).join('')}</div></div>`,
     () => `<h2>How do you train?</h2><p class="muted">You can switch any time — both keep their own plan, and one coach reads them together.</p>
       <div class="choice-list mt">${[['cal', 'Calisthenics', 'Bodyweight: bars, floor, skills like the muscle-up and handstand. Progressions instead of plates.', 'train'], ['gym', 'Gym / weights', 'Barbells, dumbbells, cables and machines. A full plan with sets, reps, weights and rest.', 'dumbbell']].map(([v, l, x, ic]) =>
         `<button class="choice glass-btn ${d.discipline === v ? 'on' : ''}" data-act="onbSet" data-k="discipline" data-v="${v}"><b>${icon(ic, 'sm')} ${l}</b><span class="small muted">${x}</span></button>`).join('')}</div>`,
@@ -1005,6 +1010,8 @@ const ACT = {
 
   /* Cloud */
   cloudSignIn: () => Cloud.signIn(),
+  setLang: d => { if (d.v !== I18N.pref) setLang(d.v); },
+  privacy: () => { const url = new URL('privacy.html', location.href).href; if (Native.isApp) Native.openBrowser(url); else window.open(url, '_blank', 'noopener'); },
   cloudDelete: () => askConfirm('Delete your account?', 'This permanently deletes your Zelum cloud backup and your sign-in from Zelum\'s servers. It can\'t be undone. Your progress stays on this device, and you can export a backup from Me first.', 'Delete forever', () => Cloud.deleteAccount()),
   cloudSignOut: () => askConfirm('Sign out?', 'Your progress stays on this device. Sign in again any time to sync.', 'Sign out', () => Cloud.signOut().then(() => render()), false),
   cloudSync: async () => { if (!Cloud.user) return; SFX.play('swoosh'); if (Cloud.unsynced()) await Cloud.push(); else await Cloud.reconcile(await Cloud.ref().get(), true); if (Cloud.status === 'synced') toast(`${icon('check', 'xs')} Up to date`); },

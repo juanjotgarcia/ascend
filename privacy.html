@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Zelum Privacy Policy</title>
+<meta name="description" content="How Zelum handles your data: what stays on your phone, what is backed up when you sign in, purchases, and how to delete your account.">
+<meta name="theme-color" content="#000000">
+<link rel="icon" href="icons/icon.svg" type="image/svg+xml">
+<style>
+  :root { --bg: #000; --fg: #f5f5f7; --muted: #a1a1a6; --line: #2c2c2e; --card: #111113; --accent: #0a84ff; }
+  * { box-sizing: border-box; }
+  html { -webkit-text-size-adjust: 100%; }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  main { max-width: 720px; margin: 0 auto; padding: 40px 16px 72px; }
+  header { display: flex; align-items: center; gap: 14px; margin-bottom: 8px; }
+  header svg { width: 44px; height: 44px; flex: none; }
+  h1 { font-size: 30px; line-height: 1.2; margin: 0; letter-spacing: -0.02em; }
+  h2 { font-size: 20px; margin: 36px 0 8px; letter-spacing: -0.01em; }
+  h3 { font-size: 16px; margin: 20px 0 4px; }
+  p, li { color: #d1d1d6; }
+  ul { padding-left: 22px; }
+  li { margin: 4px 0; }
+  a { color: var(--accent); }
+  b, strong { color: var(--fg); }
+  .date { color: var(--muted); font-size: 14px; margin: 0 0 24px; }
+  .box { background: var(--card); border: 1px solid var(--line); border-radius: 16px; padding: 4px 20px; margin: 20px 0; }
+  .box ul { padding-left: 20px; }
+  footer { margin-top: 48px; padding-top: 20px; border-top: 1px solid var(--line); color: var(--muted); font-size: 14px; }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <svg viewBox="0 0 512 512" aria-hidden="true"><rect width="512" height="512" rx="115" fill="#111"/><path fill="#fff" d="M136 132H376V180H136Z M136 332H376V380H136Z M293 198H376L219 314H136Z"/></svg>
+    <h1>Zelum Privacy Policy</h1>
+  </header>
+  <p class="date">Effective November 25, 2026</p>
+
+  <p>Zelum is a training app for calisthenics and the gym, with habits, nutrition targets and progress tracking.
+  This policy explains what data the Zelum app and website handle, why, and the choices you have. Questions:
+  <a href="mailto:zelumcorp@gmail.com">zelumcorp@gmail.com</a>.</p>
+
+  <div class="box">
+    <h3>The short version</h3>
+    <ul>
+      <li>Zelum works fully <b>without an account</b>. Then everything stays on your phone or computer.</li>
+      <li>If you <b>sign in with Google</b>, a copy of your Zelum data is backed up so you can sync devices.</li>
+      <li>We show <b>no ads</b>, use <b>no third-party tracking</b>, and <b>never sell</b> your data.</li>
+      <li>You can <b>delete your account and backup</b> in the app at any time: Me → Account → Delete account &amp; cloud backup.</li>
+    </ul>
+  </div>
+
+  <h2>1. Data that stays on your device</h2>
+  <p>Your profile (name or nickname, height, body weight, goals), workouts, sets, personal records, habits, nutrition
+  entries, notes and settings are saved in the app's storage on your device. If you don't sign in, this data never
+  leaves your device. Uninstalling the app or clearing its data erases it, so use <b>Export backup</b> (Me → Settings
+  → Your data) if you want to keep a copy.</p>
+
+  <h2>2. If you sign in with Google</h2>
+  <p>Signing in is optional. It exists only to back up your progress and sync it between your devices. When you sign in:</p>
+  <ul>
+    <li><b>Google sign-in</b> (Firebase Authentication, provided by Google) gives Zelum your name, email address,
+    profile photo and an account ID.</li>
+    <li><b>Cloud backup</b> (Cloud Firestore, provided by Google) stores a copy of the Zelum data described in
+    section 1, linked to that account ID.</li>
+    <li>Only you can read or change your backup: access rules allow each signed-in person to reach their own data only.
+    Data travels encrypted (HTTPS) and is stored on Google Cloud servers.</li>
+  </ul>
+  <p>We use this data only to run these features: signing you in, restoring your progress and keeping your devices in sync.</p>
+
+  <h2>3. Purchases and subscriptions</h2>
+  <p>Zelum offers optional paid plans. In the Android app:</p>
+  <ul>
+    <li><b>Google Play</b> handles the payment. Zelum never sees your card or bank details.</li>
+    <li><b>RevenueCat</b>, our subscription service provider, receives the purchase receipt from Google Play and an app
+    user ID (your Zelum account ID if you are signed in, otherwise a random ID) to confirm which plan you have. It does
+    not receive your name, email or training data.</li>
+  </ul>
+  <p>Google and RevenueCat keep purchase records as needed for billing, refunds, tax and accounting. You manage or
+  cancel subscriptions in Google Play → Payments &amp; subscriptions.</p>
+
+  <h2>4. Music colors (optional)</h2>
+  <p>Zelum can tint its colors to match the album you are playing. This is off until you turn it on.</p>
+  <ul>
+    <li><b>Android, "Any app":</b> with the notification access you grant, Zelum reads the title, artist and cover of
+    the song playing in your music app. This happens on your phone only. Zelum reads no other notifications and never
+    sends song information anywhere.</li>
+    <li><b>Website, Last.fm:</b> if you enter a Last.fm username and API key, your browser asks Last.fm directly for
+    your current track. Last.fm's own privacy policy applies to that request.</li>
+  </ul>
+
+  <h2>5. Notifications and reminders</h2>
+  <p>Workout timers, rest alerts and habit reminders are scheduled on your device. They are not sent through our
+  servers. During a workout, Android shows a live notification with your timer; it stops when you finish.</p>
+
+  <h2>6. Website hosting</h2>
+  <p>Like any website, the servers that deliver Zelum's web pages (GitHub Pages and Cloudflare) process your IP address
+  and basic request details to send the pages to you. We do not use these logs to identify or track you.</p>
+
+  <h2>7. What we don't do</h2>
+  <ul>
+    <li>No advertising and no advertising IDs.</li>
+    <li>No third-party analytics or tracking.</li>
+    <li>No selling, renting or sharing of your personal data with anyone for their own purposes.</li>
+  </ul>
+  <p>If this ever changes (for example, to add privacy-friendly usage statistics), we will update this page first and
+  say so in the app.</p>
+
+  <h2 id="delete">8. Deleting your account and data</h2>
+  <p><b>In the app:</b> Me → Account → <b>Delete account &amp; cloud backup</b>. This immediately and permanently
+  deletes your cloud backup and your Zelum sign-in. Data on your device stays until you reset it (Me → Settings →
+  Your data → Reset) or uninstall the app.</p>
+  <p><b>Without the app:</b> email <a href="mailto:zelumcorp@gmail.com?subject=Delete%20my%20Zelum%20account">zelumcorp@gmail.com</a>
+  from the Google account you signed in with, with the subject "Delete my Zelum account". We delete your sign-in
+  and cloud backup within 30 days and confirm by email.</p>
+  <p>What is deleted: your account ID, name, email, photo and every piece of backed-up Zelum data. What is kept:
+  purchase records held by Google Play and RevenueCat, as required by law. Nothing else is kept.</p>
+
+  <h2>9. Your choices and rights</h2>
+  <ul>
+    <li><b>Access and copy:</b> Export backup gives you all your Zelum data as a file.</li>
+    <li><b>Correct:</b> edit your profile and entries in the app.</li>
+    <li><b>Delete:</b> see section 8.</li>
+    <li><b>Stop syncing:</b> sign out at any time. The app keeps working offline.</li>
+  </ul>
+  <p>Depending on where you live, you may have further rights under local law. Email us and we will help.</p>
+
+  <h2>10. Children</h2>
+  <p>Zelum is not directed at children under 13, and we do not knowingly collect their data. If you believe a child
+  has given us data, email us and we will delete it.</p>
+
+  <h2>11. Changes to this policy</h2>
+  <p>When this policy changes, we update the date at the top. Important changes are also announced in the app.</p>
+
+  <h2>12. Contact</h2>
+  <p>Zelum · <a href="mailto:zelumcorp@gmail.com">zelumcorp@gmail.com</a></p>
+
+  <footer>© 2026 Zelum</footer>
+</main>
+</body>
+</html>

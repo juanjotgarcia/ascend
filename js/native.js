@@ -96,7 +96,7 @@ const Native = {
     const ns = nextSet();
     const next = ns && !ns.done ? `Set ${ns.n}/${ns.of} · ${ns.name}${ns.t ? ` · ${ns.t}${ns.u}` : ''}${ns.kg ? ` · ${ns.kgTxt}` : ''}` : 'All sets done — finish when ready';
     const done = sum(S.active.entries.map(e => doneSets(e).length));
-    const data = { action: 'update', title: S.active.name, next, sub: `${done} set${done === 1 ? '' : 's'} done`, startedAt: S.active.start,
+    const data = { action: 'update', title: tr(S.active.name), next: tr(next), sub: tr(`${done} set${done === 1 ? '' : 's'} done`), startedAt: S.active.start,
       restEndsAt: rest ? Math.round(rest.end) : 0, restSec: S.settings.restSec, accent: themeColors().accent };
     const sig = JSON.stringify(data);
     if (sig === this.wsig) return;
@@ -153,7 +153,7 @@ const Native = {
         let id = 100000 + (hashStr(k + r.key) % 99990);
         while (ids.has(id)) id++;
         ids.add(id);
-        list.push({ id, title: r.title, body: r.body, schedule: { at, allowWhileIdle: true }, isExactNotification: exact, channelId: 'reminders', smallIcon: 'ic_stat_ledger', iconColor: '#FFFFFF', extra: { to: r.to } });
+        list.push({ id, title: tr(r.title), body: tr(r.body), schedule: { at, allowWhileIdle: true }, isExactNotification: exact, channelId: 'reminders', smallIcon: 'ic_stat_ledger', iconColor: '#FFFFFF', extra: { to: r.to } });
       }
     }
     list.sort((a, b) => a.schedule.at - b.schedule.at);
@@ -165,15 +165,15 @@ const Native = {
     const v = faithOn() ? verseOfDay() : { text: quoteOfDay(), ref: '' };   // the daily-line widget: verse only in Faith mode
     const next = S.active ? `In progress: ${S.active.name}` : workoutsOn(k).length ? 'Trained today ✓' : isTrainingDay(k) ? `Next: ${tplInfo(nextTemplate()).name}` : 'Rest day — recover well';
     this.p.ledger.widgets({
-      done: due.length - open.length, due: due.length, streak: streak(), rank: `${li.title} · Lv ${li.lvl}`,
-      accent: c.accent, faith: c.faith, next, verse: v.text, ref: v.ref, quote: faithOn() ? quoteOfDay() : '',
-      habits: [...open, ...due.filter(h => habitDone(h, k))].slice(0, 3).map(h => ({ name: h.name, done: habitDone(h, k) })),
+      done: due.length - open.length, due: due.length, streak: streak(), rank: tr(`${li.title} · Lv ${li.lvl}`),
+      accent: c.accent, faith: c.faith, next: tr(next), verse: tr(v.text), ref: tr(v.ref), quote: faithOn() ? tr(quoteOfDay()) : '',
+      habits: [...open, ...due.filter(h => habitDone(h, k))].slice(0, 3).map(h => ({ name: tr(h.name), done: habitDone(h, k) })),
     }).catch(e => console.warn('widgets', e));
   },
   async testNotification() {
     if (!(await this.ensurePermission())) return toast('Allow notifications for Zelum in Android settings');
     if (this.exact === null) await this.checkExact();
-    await this.p.notif.schedule({ notifications: [{ id: 199999, title: 'Zelum notifications are on', body: 'Reminders arrive even when Zelum is closed.', schedule: { at: new Date(Date.now() + 2500), allowWhileIdle: true }, isExactNotification: this.exactOn(), channelId: 'reminders', smallIcon: 'ic_stat_ledger', iconColor: '#FFFFFF' }] });
+    await this.p.notif.schedule({ notifications: [{ id: 199999, title: tr('Zelum notifications are on'), body: tr('Reminders arrive even when Zelum is closed.'), schedule: { at: new Date(Date.now() + 2500), allowWhileIdle: true }, isExactNotification: this.exactOn(), channelId: 'reminders', smallIcon: 'ic_stat_ledger', iconColor: '#FFFFFF' }] });
     toast('Test notification in 2 seconds');
   },
 };

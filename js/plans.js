@@ -205,7 +205,7 @@ function paywallHTML() {
 }
 /* Me → Plan card */
 function planCardHTML() {
-  const p = Plan.current(), s = S.sub, renew = s && s.expires && !s.lifetime ? new Date(s.expires).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '';
+  const p = Plan.current(), s = S.sub, renew = s && s.expires && !s.lifetime ? new Date(s.expires).toLocaleDateString(LOCALE, { month: 'short', day: 'numeric', year: 'numeric' }) : '';
   return `${cardHead('Your plan', `<span class="plan-tag ${p}">${p === 'free' ? '' : icon('crown', 'xs')} ${esc(PLAN_NAMES[p])}</span>`, 'crown')}
     <h2>${esc(Plan.label())}</h2>
     <p class="small muted mt-s">${S.founder ? 'You were here before plans existed, so every Pro feature is yours for life.'
