@@ -52,55 +52,97 @@ async function askNotifPermission() {
 }
 const notifState = () => Native.isApp ? 'granted' : !('Notification' in window) ? 'unsupported' : Notification.permission;
 
-/* ---------- Live Activity (workout island) ---------- */
-let islandOpen = false, islandSig = '';
+/* ---------- Live workout bar (v1.15.1) ----------
+   One glass widget for the whole workout: elapsed time, workout name, the current exercise and set, and the
+   rest timer (ring + countdown) — never a second bubble on top of it.
+   • On Train it is the sticky header of the workout (with Finish); elsewhere it floats at the top (#island).
+   • Workout: green tint (--success). Rest: the "Rest timer" color (Me → Appearance; follows the album when
+     music colors are on and the user hasn't picked one). Rest over: a short green flash in the bar itself.
+   • Tap: a glass panel slides out under the bar (transform + opacity only, so it stays smooth at 120 Hz).
+   The HTML depends only on state that changes on events (sig); the clock and ring are written by tick(). */
+let islandOpen = false, islandSig = '', restDoneAt = 0;
 function nextSet() {
   const w = S.active; if (!w) return null;
-  for (const e of w.entries) {
-    const i = e.sets.findIndex(s => !s.done);
-    if (i >= 0) { const ex = getEx(e.ex); return { name: ex ? entryName(e) : e.ex, n: i + 1, of: e.sets.length, t: e.sets[i].t, kg: e.sets[i].kg, kgTxt: kgLabel(ex, e.sets[i].kg), u: unitOf(ex), rest: e.rest }; }
+  for (let ei = 0; ei < w.entries.length; ei++) {
+    const e = w.entries[ei], i = e.sets.findIndex(s => !s.done);
+    if (i >= 0) { const ex = getEx(e.ex); return { ei, name: ex ? entryName(e) : e.ex, n: i + 1, of: e.sets.length, t: e.sets[i].t, kg: e.sets[i].kg, kgTxt: kgLabel(ex, e.sets[i].kg), u: unitOf(ex), rest: e.rest }; }
   }
   return { done: true };
 }
+const mmss = s => `${Math.floor(s / 60)}:${pad(Math.floor(s % 60))}`;
+const LB_C = 94.25;   // ring circumference (r = 15)
+function liveClock() {
+  const el = (Date.now() - S.active.start) / 1000;
+  if (!rest) return { el, left: 0, frac: 0 };
+  const left = Math.max(0, (rest.end - Date.now()) / 1000);
+  return { el, left, frac: rest.total ? left / rest.total : 0 };
+}
+function setsProgress() {
+  let done = 0, all = 0;
+  for (const e of S.active.entries) { all += e.sets.length; done += e.sets.filter(s => s.done).length; }
+  return all ? done / all : 0;
+}
+function liveBarHTML(where) {
+  const w = S.active, ns = nextSet() || { done: true }, resting = !!rest, flash = !resting && Date.now() - restDoneAt < 4000;
+  const c = liveClock(), head = where === 'head';
+  const ring = resting ? c.frac : setsProgress();
+  const target = ns.done ? '' : `${ns.t ?? ''}${ns.u || ' reps'}${ns.kg ? ` · ${ns.kgTxt}` : ''}`;
+  const title = resting ? 'Rest' : flash ? 'Rest over — next set' : ns.done ? 'All sets done — finish when ready' : ns.name;
+  const sub = ns.done ? w.name : resting ? `Next · ${ns.name} · Set ${ns.n}/${ns.of}` : `Set ${ns.n}/${ns.of}${target ? ` · ${target}` : ''}`;
+  const cls = `lb glass ${resting ? 'resting' : ''} ${flash ? 'flash' : ''} ${islandOpen ? 'open' : ''}`;
+  return `<div class="${cls}" data-act="islandToggle" role="button" aria-expanded="${islandOpen}" aria-label="Workout in progress">
+    <div class="lb-row">
+      <span class="lb-ring"><svg viewBox="0 0 36 36" aria-hidden="true"><circle cx="18" cy="18" r="15" class="lb-track"/>
+        <circle data-lb-ring cx="18" cy="18" r="15" class="lb-arc" stroke-dasharray="${LB_C}" style="stroke-dashoffset:${(LB_C * (1 - ring)).toFixed(2)}" transform="rotate(-90 18 18)"/></svg>
+        ${resting ? `<b class="lb-count" data-lb-left>${mmss(Math.ceil(c.left))}</b>` : '<i class="lb-dot"></i>'}</span>
+      <span class="lb-main"><span class="lb-eye"><b data-lb-elapsed>${mmss(c.el)}</b> · ${esc(w.name)}</span>
+        <b class="lb-title">${esc(title)}</b><span class="lb-sub">${esc(sub)}</span></span>
+      ${head ? '<button class="btn primary lb-finish" data-act="finish">Finish</button>' : ''}
+    </div>
+    <div class="lb-panel glass" aria-hidden="${!islandOpen}">
+      ${target && !resting ? `<p class="lb-target">${icon('target', 'xs')} Target <b>${esc(target)}</b></p>` : ''}
+      <div class="lb-ctrl">
+        ${resting ? `<button class="chip-btn" data-act="restAdd" data-d="-15">−15 s</button><button class="chip-btn" data-act="restAdd" data-d="15">+15 s</button><button class="chip-btn on" data-act="restSkip">Skip</button>`
+          : ns.done ? '' : `<button class="chip-btn on" data-act="islandSetDone">${icon('check', 'xs')} Set done</button>`}
+        ${head ? (ns.done ? '' : `<button class="chip-btn" data-act="lbGoEx" data-e="${ns.ei}">${icon('down', 'xs')} Go to exercise</button>`)
+          : `<button class="chip-btn" data-go="train">${icon('train', 'xs')} Open</button>`}
+      </div>
+    </div>
+  </div>`;
+}
+function liveSig() {
+  const ns = nextSet() || {};
+  return [!!rest, rest && rest.total, islandOpen, Date.now() - restDoneAt < 4000, ns.done ? 'done' : `${ns.name}|${ns.n}|${ns.of}|${ns.t}|${ns.kg}`, S.active.name, route].join('|');
+}
+/* Kept under its old name: tick(), the native bridge and the actions call it */
 function renderIsland() {
   const box = document.getElementById('island'); if (!box) return;
-  const show = S.onboarded && S.active && (route !== 'train' || rest);
-  if (!show) { box.className = ''; box.innerHTML = ''; islandSig = ''; return; }
-  const ns = nextSet(), resting = !!rest;
-  const sig = `${resting}|${islandOpen}|${ns && (ns.done ? 'done' : ns.name + ns.n)}|${S.active.name}`;
+  const on = S.onboarded && S.active;
+  const head = on && route === 'train' ? document.querySelector('.live-head') : null;
+  const float = on && !head && route !== 'train';
+  if (!on) { if (box.className) { box.className = ''; box.innerHTML = ''; box.__html = ''; } islandSig = ''; return; }
+  const sig = liveSig();
   if (sig !== islandSig) {
     islandSig = sig;
-    const sub = ns.done ? 'All sets done — finish when ready' : `${resting ? 'Next · ' : ''}Set ${ns.n}/${ns.of} · ${ns.name}`;
-    const target = ns.done ? '' : `${ns.t ?? ''}${ns.u}${ns.kg ? ` · ${ns.kgTxt}` : ''}`;
-    box.className = `on ${resting ? 'resting' : ''} ${islandOpen ? 'open' : ''}`;
-    box.innerHTML = `<div class="isl glass" data-act="islandToggle" role="button" aria-label="Workout in progress">
-      <span class="isl-dot"></span>
-      <span class="isl-main"><b>${esc(resting ? 'Rest' : S.active.name)}</b><span>${esc(sub)}</span></span>
-      <span class="isl-right">${resting ? `<svg class="isl-ring" viewBox="0 0 36 36"><circle cx="18" cy="18" r="15" stroke="rgba(255,255,255,.15)" stroke-width="3.2" fill="none"/><circle data-isl-ring cx="18" cy="18" r="15" stroke="var(--accent)" stroke-width="3.2" fill="none" stroke-linecap="round" stroke-dasharray="94.25" transform="rotate(-90 18 18)"/></svg>` : ''}<b class="isl-time" data-isl-time></b></span>
-      ${islandOpen ? `<div class="isl-x">
-        ${target ? `<p class="isl-target">${icon('target', 'xs')} Target <b>${esc(target)}</b></p>` : ''}
-        <div class="isl-ctrl">
-          ${resting ? `<button class="chip-btn" data-act="restAdd" data-d="-15">−15s</button><button class="chip-btn" data-act="restAdd" data-d="15">+15s</button><button class="chip-btn" data-act="restSkip">Skip</button>`
-            : `<button class="chip-btn" data-act="islandSetDone">${icon('check', 'xs')} Set done</button>`}
-          <button class="chip-btn on" data-go="train">${icon('train', 'xs')} Open</button>
-        </div></div>` : ''}
-    </div>`;
+    if (head) morphHTML(head, liveBarHTML('head'));
+    if (float) { box.className = 'on'; morphHTML(box, liveBarHTML('island')); }
   }
-  const t = box.querySelector('[data-isl-time]');
-  if (resting) {
-    const left = Math.max(0, (rest.end - Date.now()) / 1000);
-    setText(t, `${Math.floor(Math.ceil(left) / 60)}:${pad(Math.ceil(left) % 60)}`);
-    const ring = box.querySelector('[data-isl-ring]'); if (ring) ring.style.strokeDashoffset = String(94.25 * (1 - left / rest.total));
-  } else {
-    const el = (Date.now() - S.active.start) / 1000;
-    setText(t, `${Math.floor(el / 60)}:${pad(Math.floor(el % 60))}`);
+  if (!float && box.className) box.className = '';
+  // Clock and ring, every tick, in whichever bar is showing
+  const c = liveClock();
+  document.querySelectorAll('[data-lb-elapsed]').forEach(n => setText(n, mmss(c.el)));
+  if (rest) {
+    document.querySelectorAll('[data-lb-left]').forEach(n => setText(n, mmss(Math.ceil(c.left))));
+    document.querySelectorAll('[data-lb-ring]').forEach(n => { n.style.strokeDashoffset = (LB_C * (1 - c.frac)).toFixed(2); });
   }
 }
 function restFinished() {
   const ns = nextSet();
-  const body = ns && !ns.done ? `Set ${ns.n} of ${ns.name}${ns.t ? ` · ${ns.t}${ns.u}` : ''}` : 'Finish strong.';
   SFX.play('rest'); haptic([200, 100, 200]);
-  notify({ title: 'Rest over — next set', body, ic: 'bolt', tone: 'accent', sound: '', go: 'train', tag: 'rest' });
+  if (document.hidden) {   // only the system notification needs words; on screen the bar itself says it
+    const body = ns && !ns.done ? `Set ${ns.n} of ${ns.name}${ns.t ? ` · ${ns.t}${ns.u}` : ''}` : 'Finish strong.';
+    notify({ title: 'Rest over — next set', body, ic: 'bolt', tone: 'accent', sound: '', go: 'train', tag: 'rest' });
+  } else { restDoneAt = Date.now(); setTimeout(() => { islandSig = ''; renderIsland(); }, 4050); }
 }
 
 /* ---------- Reminders ---------- */
@@ -170,6 +212,7 @@ function notifCardHTML() {
 
 const NOTIF_ACT = {
   islandToggle: (d, el, e) => { if (e && e.target.closest('button')) return; islandOpen = !islandOpen; islandSig = ''; SFX.play('tap'); renderIsland(); },
+  lbGoEx: d => { islandOpen = false; islandSig = ''; renderIsland(); const el = document.getElementById(`ex-${d.e}`); if (el) el.scrollIntoView({ behavior: matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth', block: 'start' }); },
   islandSetDone: () => {
     const w = S.active; if (!w) return;
     for (let ei = 0; ei < w.entries.length; ei++) { const si = w.entries[ei].sets.findIndex(s => !s.done); if (si >= 0) { ACT.setDone({ e: ei, s: si }); break; } }

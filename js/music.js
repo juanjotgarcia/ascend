@@ -244,7 +244,7 @@ async function paletteFrom(url) {
   const accent = grey ? '#f2f2f7' : hslHex(a1.h, Math.max(0.55, a1.s), Math.min(0.68, Math.max(0.55, a1.l)));
   const accent2 = grey ? '#8e8e93' : hslHex(a2.h, Math.max(0.5, a2.s), Math.min(0.62, Math.max(0.48, a2.l)));
   return {
-    accent, accent2,
+    accent, accent2, rest: accent,
     glow1: grey ? '#3a3a3f' : hslHex(g1.h, Math.min(0.85, Math.max(0.45, g1.s)), 0.32),
     glow2: grey ? '#1c1c1f' : hslHex(g2.h, Math.min(0.8, Math.max(0.4, g2.s)), 0.2),
     logo: grey ? '#ffffff' : hslHex(a1.h, Math.max(0.5, a1.s), 0.78),

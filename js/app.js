@@ -1,6 +1,6 @@
 /* ZELUM — views, navigation and actions. */
 
-const VERSION = '1.15.0';
+const VERSION = '1.15.1';
 /* Browser engine version (the Android app's WebView updates separately from Chrome), shown under Me for support */
 const engineTag = () => { const m = navigator.userAgent.match(/Chrome\/(\d+)/); return m ? ` · ${/LedgerAndroid|; wv\)/.test(navigator.userAgent) ? 'WebView' : 'Chrome'} ${m[1]}` : ''; };
 const NAV = [
@@ -306,9 +306,7 @@ function calWorkoutsTab() {
 function viewActive() {
   const w = S.active;
   const exOptions = (sel = '', forEntry = null) => exOptionsHTML(sel, forEntry);
-  return `<header class="page-head sticky-head glass">
-      <div><p class="eyebrow"><span class="live-dot"></span> <span data-elapsed></span></p><h1 class="h-mid">${esc(w.name)}</h1></div>
-      <button class="btn primary" data-act="finish">Finish</button></header>
+  return `<header class="sticky-head live-head">${liveBarHTML('head')}</header>
     ${faithOn() ? `<section class="card glass dedicate"><p class="small"><b>Dedicate this session.</b> <i>“${esc(VERSES[15].text)}” — ${VERSES[15].ref}</i></p></section>` : ''}
     ${w.entries.map((e, ei) => {
       const ex = getEx(e.ex); if (!ex) return '';

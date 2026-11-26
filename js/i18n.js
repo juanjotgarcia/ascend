@@ -72,6 +72,7 @@ function setLang(v) { try { localStorage.setItem(I18N.KEY, v); } catch (e) { } l
   // Fallbacks for text glued together from parts: "Chest · Barbell" translates part by part, and a final
   // period or colon is tried without it. null when nothing in it is known.
   function pieces(k, depth) {
+    if (k.startsWith('· ')) { const t = look(k.slice(2), depth + 1); return t === null ? null : '· ' + t; }
     if (k.indexOf(' · ') > 0) {
       let hit = false;
       const out = k.split(' · ').map(p => { const t = look(p, depth + 1); if (t !== null) hit = true; return t ?? p; }).join(' · ');

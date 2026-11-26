@@ -10,6 +10,15 @@
 
 const RELEASES = [
   {
+    v: '1.15.1', date: '2026-11-26',
+    title: 'One glass bar for your workout',
+    intro: 'The timer, the exercise you\'re on and the rest countdown now live in one bar that stays at the top while you scroll. Tap it for rest controls and Set done.',
+    items: [
+      ['new', 'Your rest color', 'The bar turns green while you train and takes the Rest timer color while you rest (Me → Settings → Appearance). With music colors on, it follows the album.'],
+      ['fixed', 'Habits fit the screen', 'Long habit descriptions no longer push the habit list wider than the phone.'],
+    ],
+  },
+  {
     v: '1.15.0', date: '2026-11-26',
     title: 'Zelum in Spanish',
     intro: 'The whole app now speaks Spanish: screens, Coach Caleb, reminders and the exercise library.',

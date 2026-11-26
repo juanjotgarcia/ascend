@@ -54,6 +54,7 @@ const ICONS = {
   palette: '<path d="M12 3a9 9 0 1 0 0 18c1.2 0 2-.8 2-1.8 0-.5-.2-.9-.5-1.3-.3-.3-.5-.7-.5-1.2 0-1 .8-1.7 1.8-1.7H17a4 4 0 0 0 4-4c0-4.4-4-8-9-8z"/><circle cx="7.5" cy="11" r="1.2"/><circle cx="10" cy="7" r="1.2"/><circle cx="15" cy="7.5" r="1.2"/>',
   undo: '<path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-3"/>',
   globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"/>',
+  down: '<path d="M12 5v14M5 12l7 7 7-7"/>',
   laurel: '<path d="M7 4c-3 3-3 10 1 14M17 4c3 3 3 10-1 14M5 9c1 .5 2 .5 3 0M4.5 13c1.2.3 2.3.1 3.2-.6M19 9c-1 .5-2 .5-3 0M19.5 13c-1.2.3-2.3.1-3.2-.6"/>',
 };
 /* Solid flame used for streak counters */
@@ -69,7 +70,9 @@ let svgIdPrefix = '';
 function themeColors() {
   const t = S.settings.theme || {};
   const music = typeof Music !== 'undefined' && Music.overlay && Music.on() ? Music.overlay : {};
-  return { ...THEMES.midnight.colors, ...(THEMES[t.preset] || {}).colors, ...(t.colors || {}), ...music };
+  // Album colors repaint the rest timer too, unless the person picked their own rest color
+  const m = t.colors && t.colors.rest && music.rest ? { ...music, rest: t.colors.rest } : music;
+  return { ...THEMES.midnight.colors, ...(THEMES[t.preset] || {}).colors, ...(t.colors || {}), ...m };
 }
 function hexToRgb(h) { const n = parseInt(h.replace('#', ''), 16); return [(n >> 16) & 255, (n >> 8) & 255, n & 255]; }
 function luminance(h) { return hexToRgb(h).map(v => { v /= 255; return v <= .03928 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; }).reduce((a, v, i) => a + v * [.2126, .7152, .0722][i], 0); }

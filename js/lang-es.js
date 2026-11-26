@@ -2720,3 +2720,18 @@ Object.assign(LANG_ES, {
   "Seconds@col": "Seg.",
   "Reps@col": "Reps",
 });
+
+/* ---------- live workout bar (v1.15.1) ---------- */
+Object.assign(LANG_ES, {
+  "Set {}/{}": "Serie {}/{}",
+  "Go to exercise": "Ir al ejercicio",
+  "Rest timer": "Temporizador de descanso",
+  "The workout bar while you rest": "La barra del entrenamiento mientras descansas",
+  "Checks, done habits, PRs, the live workout": "Marcas, hábitos hechos, récords, el entrenamiento en vivo",
+  "One glass bar for your workout": "Una sola barra de vidrio para tu entrenamiento",
+  "The timer, the exercise you're on and the rest countdown now live in one bar that stays at the top while you scroll. Tap it for rest controls and Set done.": "El tiempo, el ejercicio en el que vas y la cuenta del descanso ahora viven en una sola barra que se queda arriba mientras bajas. Tócala para los controles del descanso y Serie hecha.",
+  "Your rest color": "Tu color de descanso",
+  "The bar turns green while you train and takes the Rest timer color while you rest (Me → Settings → Appearance). With music colors on, it follows the album.": "La barra se pone verde mientras entrenas y toma el color del temporizador de descanso mientras descansas (Perfil → Ajustes → Apariencia). Con los colores de música activados, sigue al álbum.",
+  "Habits fit the screen": "Los hábitos caben en la pantalla",
+  "Long habit descriptions no longer push the habit list wider than the phone.": "Las descripciones largas de los hábitos ya no hacen la lista más ancha que el teléfono.",
+});
